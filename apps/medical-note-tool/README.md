@@ -14,7 +14,7 @@ Static React app for generating medical note templates in-browser only.
 From the repository root:
 
 ```bash
-cd /home/runner/work/moc/moc/apps/medical-note-tool
+cd apps/medical-note-tool
 npm install
 npm run dev
 ```
@@ -24,7 +24,7 @@ Open the URL printed by Vite (normally `http://localhost:5173`).
 ## Production Build
 
 ```bash
-cd /home/runner/work/moc/moc/apps/medical-note-tool
+cd apps/medical-note-tool
 npm run build
 ```
 
@@ -35,7 +35,7 @@ Build output is generated in `dist/`.
 Deploy the `dist/` directory to any static host (for example GitHub Pages, Netlify, Vercel static hosting, S3 + CloudFront, or Nginx static hosting):
 
 ```bash
-cd /home/runner/work/moc/moc/apps/medical-note-tool
+cd apps/medical-note-tool
 npm run build
 npm run preview
 ```
