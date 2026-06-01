@@ -3,7 +3,7 @@ import type { FormEvent } from 'react'
 import './App.css'
 
 type YesNo = '' | 'yes' | 'no'
-type ToolSelection = 'medical-note' | null
+type ToolSelection = 'medical-note' | 'sms-table' | null
 
 type FormData = {
   patientName: string
@@ -48,6 +48,18 @@ const PRESCRIBER_OPTIONS = [
 const MEDICATION_OPTIONS = ['OZEMPIC/WAGOVY', 'ZEPBOUND/MONJAURO']
 
 const PRIORITY_OPTIONS = ['Normal', 'Rush']
+
+const SMS_TABLE_HEADERS = [
+  'Date Entered',
+  'Patient Name',
+  'Client Account',
+  'Prescriber',
+  'Status (e.g., Pending, Approved)',
+  'What is the Priority?',
+  'Phone Number',
+  'Cleaned Number',
+  '2nd Text Response',
+] as const
 
 const INITIAL_FORM: FormData = {
   patientName: '',
@@ -415,6 +427,41 @@ function MedicalNoteTool({ onBackToTools }: { onBackToTools: () => void }) {
   )
 }
 
+function SmsTableTool({ onBackToTools }: { onBackToTools: () => void }) {
+  return (
+    <main className="app">
+      <div className="app-header">
+        <button type="button" className="secondary" onClick={onBackToTools}>
+          Back to tools
+        </button>
+      </div>
+      <h1>SMS TABLE</h1>
+      <p className="privacy">Use this table to track SMS workflow details.</p>
+
+      <section className="preview sms-table-section">
+        <div className="table-scroll">
+          <table className="sms-table">
+            <thead>
+              <tr>
+                {SMS_TABLE_HEADERS.map((header) => (
+                  <th key={header}>{header}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                {SMS_TABLE_HEADERS.map((header) => (
+                  <td key={header}>—</td>
+                ))}
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+  )
+}
+
 function App() {
   const [accessCode, setAccessCode] = useState('')
   const [accessError, setAccessError] = useState('')
@@ -470,10 +517,17 @@ function App() {
             <button type="button" onClick={() => setSelectedTool('medical-note')}>
               Medical Note
             </button>
+            <button type="button" onClick={() => setSelectedTool('sms-table')}>
+              SMS TABLE
+            </button>
           </div>
         </section>
       </main>
     )
+  }
+
+  if (selectedTool === 'sms-table') {
+    return <SmsTableTool onBackToTools={() => setSelectedTool(null)} />
   }
 
   return <MedicalNoteTool onBackToTools={() => setSelectedTool(null)} />
