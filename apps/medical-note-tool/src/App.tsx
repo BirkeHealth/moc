@@ -3,6 +3,7 @@ import type { FormEvent } from 'react'
 import './App.css'
 
 type YesNo = '' | 'yes' | 'no'
+type ToolSelection = 'medical-note' | null
 
 type FormData = {
   patientName: string
@@ -106,6 +107,9 @@ Recommend drinking sufficient water and working on adhering to a balanced diet w
 Will follow up with patient in 3-4 weeks to assess response and side effects.`
 
 const MISSING_VALUE = '—'
+// Frontend-only temporary gate for static hosting. This is not secure authentication
+// and should be replaced by server-side auth before any sensitive use.
+const TEMPORARY_ACCESS_CODE = 'MEDICAL-NOTE-ACCESS'
 
 const getAge = (dob: string): string => {
   if (!dob) return MISSING_VALUE
@@ -145,7 +149,7 @@ const fillTemplate = (template: string, values: Record<string, string>): string 
     return result.replace(pattern, value || MISSING_VALUE)
   }, template)
 
-function App() {
+function MedicalNoteTool({ onBackToTools }: { onBackToTools: () => void }) {
   const [formData, setFormData] = useState<FormData>(INITIAL_FORM)
   const [copyFeedback, setCopyFeedback] = useState('')
 
@@ -194,6 +198,11 @@ function App() {
 
   return (
     <main className="app">
+      <div className="app-header">
+        <button type="button" className="secondary" onClick={onBackToTools}>
+          Back to tools
+        </button>
+      </div>
       <h1>Medical Note Template Tool</h1>
       <p className="privacy">All processing stays in your browser. No data is saved or transmitted.</p>
 
@@ -404,6 +413,70 @@ function App() {
       </div>
     </main>
   )
+}
+
+function App() {
+  const [accessCode, setAccessCode] = useState('')
+  const [accessError, setAccessError] = useState('')
+  const [isAccessGranted, setIsAccessGranted] = useState(false)
+  const [selectedTool, setSelectedTool] = useState<ToolSelection>(null)
+
+  const handleAccessSubmit = (event: FormEvent) => {
+    event.preventDefault()
+
+    if (accessCode.trim().toUpperCase() === TEMPORARY_ACCESS_CODE) {
+      setAccessError('')
+      setIsAccessGranted(true)
+      return
+    }
+
+    setAccessError('Invalid access code. Please try again.')
+  }
+
+  if (!isAccessGranted) {
+    return (
+      <main className="app gate-page">
+        <section className="gate-card">
+          <h1>BirkeHealth Tools</h1>
+          <p className="privacy">
+            Enter the access code to continue. This gate is client-side only and should not be treated as secure authentication.
+          </p>
+          <form onSubmit={handleAccessSubmit} className="gate-form">
+            <label>
+              Access Code
+              <input
+                value={accessCode}
+                onChange={(event) => {
+                  setAccessError('')
+                  setAccessCode(event.target.value)
+                }}
+              />
+            </label>
+            <button type="submit">Continue</button>
+          </form>
+          {accessError && <p className="feedback">{accessError}</p>}
+        </section>
+      </main>
+    )
+  }
+
+  if (selectedTool === null) {
+    return (
+      <main className="app gate-page">
+        <section className="gate-card">
+          <h1>Select a Tool</h1>
+          <p className="privacy">Choose a tool to open.</p>
+          <div className="tool-list">
+            <button type="button" onClick={() => setSelectedTool('medical-note')}>
+              Medical Note
+            </button>
+          </div>
+        </section>
+      </main>
+    )
+  }
+
+  return <MedicalNoteTool onBackToTools={() => setSelectedTool(null)} />
 }
 
 export default App
