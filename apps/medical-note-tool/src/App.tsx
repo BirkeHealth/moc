@@ -3,6 +3,7 @@ import type { FormEvent } from 'react'
 import './App.css'
 
 type YesNo = '' | 'yes' | 'no'
+type ToolSelection = 'medical-note' | null
 
 type FormData = {
   patientName: string
@@ -106,6 +107,8 @@ Recommend drinking sufficient water and working on adhering to a balanced diet w
 Will follow up with patient in 3-4 weeks to assess response and side effects.`
 
 const MISSING_VALUE = '—'
+// Frontend-only temporary gate for static hosting. This is not secure authentication
+// and should be replaced by server-side auth before any sensitive use.
 const TEMPORARY_ACCESS_CODE = 'MEDICAL-NOTE-ACCESS'
 
 const getAge = (dob: string): string => {
@@ -415,20 +418,22 @@ function MedicalNoteTool({ onBackToTools }: { onBackToTools: () => void }) {
 function App() {
   const [accessCode, setAccessCode] = useState('')
   const [accessError, setAccessError] = useState('')
-  const [selectedTool, setSelectedTool] = useState<'medical-note' | ''>('')
+  const [isAccessGranted, setIsAccessGranted] = useState(false)
+  const [selectedTool, setSelectedTool] = useState<ToolSelection>(null)
 
   const handleAccessSubmit = (event: FormEvent) => {
     event.preventDefault()
 
-    if (accessCode.trim() === TEMPORARY_ACCESS_CODE) {
+    if (accessCode.trim().toUpperCase() === TEMPORARY_ACCESS_CODE) {
       setAccessError('')
+      setIsAccessGranted(true)
       return
     }
 
     setAccessError('Invalid access code. Please try again.')
   }
 
-  if (accessCode.trim() !== TEMPORARY_ACCESS_CODE) {
+  if (!isAccessGranted) {
     return (
       <main className="app gate-page">
         <section className="gate-card">
@@ -445,19 +450,17 @@ function App() {
                   setAccessError('')
                   setAccessCode(event.target.value)
                 }}
-                autoComplete="off"
               />
             </label>
             <button type="submit">Continue</button>
           </form>
           {accessError && <p className="feedback">{accessError}</p>}
-          <p className="privacy">Temporary code (frontend only): {TEMPORARY_ACCESS_CODE}</p>
         </section>
       </main>
     )
   }
 
-  if (selectedTool !== 'medical-note') {
+  if (selectedTool === null) {
     return (
       <main className="app gate-page">
         <section className="gate-card">
@@ -473,7 +476,7 @@ function App() {
     )
   }
 
-  return <MedicalNoteTool onBackToTools={() => setSelectedTool('')} />
+  return <MedicalNoteTool onBackToTools={() => setSelectedTool(null)} />
 }
 
 export default App
