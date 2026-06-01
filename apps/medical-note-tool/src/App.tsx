@@ -106,6 +106,7 @@ Recommend drinking sufficient water and working on adhering to a balanced diet w
 Will follow up with patient in 3-4 weeks to assess response and side effects.`
 
 const MISSING_VALUE = '—'
+const TEMPORARY_ACCESS_CODE = 'MEDICAL-NOTE-ACCESS'
 
 const getAge = (dob: string): string => {
   if (!dob) return MISSING_VALUE
@@ -145,7 +146,7 @@ const fillTemplate = (template: string, values: Record<string, string>): string 
     return result.replace(pattern, value || MISSING_VALUE)
   }, template)
 
-function App() {
+function MedicalNoteTool({ onBackToTools }: { onBackToTools: () => void }) {
   const [formData, setFormData] = useState<FormData>(INITIAL_FORM)
   const [copyFeedback, setCopyFeedback] = useState('')
 
@@ -194,6 +195,11 @@ function App() {
 
   return (
     <main className="app">
+      <div className="app-header">
+        <button type="button" className="secondary" onClick={onBackToTools}>
+          Back to tools
+        </button>
+      </div>
       <h1>Medical Note Template Tool</h1>
       <p className="privacy">All processing stays in your browser. No data is saved or transmitted.</p>
 
@@ -404,6 +410,70 @@ function App() {
       </div>
     </main>
   )
+}
+
+function App() {
+  const [accessCode, setAccessCode] = useState('')
+  const [accessError, setAccessError] = useState('')
+  const [selectedTool, setSelectedTool] = useState<'medical-note' | ''>('')
+
+  const handleAccessSubmit = (event: FormEvent) => {
+    event.preventDefault()
+
+    if (accessCode.trim() === TEMPORARY_ACCESS_CODE) {
+      setAccessError('')
+      return
+    }
+
+    setAccessError('Invalid access code. Please try again.')
+  }
+
+  if (accessCode.trim() !== TEMPORARY_ACCESS_CODE) {
+    return (
+      <main className="app gate-page">
+        <section className="gate-card">
+          <h1>BirkeHealth Tools</h1>
+          <p className="privacy">
+            Enter the access code to continue. This gate is client-side only and should not be treated as secure authentication.
+          </p>
+          <form onSubmit={handleAccessSubmit} className="gate-form">
+            <label>
+              Access Code
+              <input
+                value={accessCode}
+                onChange={(event) => {
+                  setAccessError('')
+                  setAccessCode(event.target.value)
+                }}
+                autoComplete="off"
+              />
+            </label>
+            <button type="submit">Continue</button>
+          </form>
+          {accessError && <p className="feedback">{accessError}</p>}
+          <p className="privacy">Temporary code (frontend only): {TEMPORARY_ACCESS_CODE}</p>
+        </section>
+      </main>
+    )
+  }
+
+  if (selectedTool !== 'medical-note') {
+    return (
+      <main className="app gate-page">
+        <section className="gate-card">
+          <h1>Select a Tool</h1>
+          <p className="privacy">Choose a tool to open.</p>
+          <div className="tool-list">
+            <button type="button" onClick={() => setSelectedTool('medical-note')}>
+              Medical Note
+            </button>
+          </div>
+        </section>
+      </main>
+    )
+  }
+
+  return <MedicalNoteTool onBackToTools={() => setSelectedTool('')} />
 }
 
 export default App
