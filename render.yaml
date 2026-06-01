@@ -1,0 +1,6 @@
+services:
+  - type: static_site
+    name: medical-note-tool
+    rootDir: apps/medical-note-tool
+    buildCommand: yarn && yarn build
+    staticPublishPath: dist
