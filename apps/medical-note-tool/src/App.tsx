@@ -109,7 +109,7 @@ Will follow up with patient in 3-4 weeks to assess response and side effects.`
 const MISSING_VALUE = '—'
 // Frontend-only temporary gate for static hosting. This is not secure authentication
 // and should be replaced by server-side auth before any sensitive use.
-const TEMPORARY_ACCESS_CODE = 'MEDICAL-NOTE-ACCESS'
+const TEMPORARY_ACCESS_CODE = 'MOC0813'
 
 const getAge = (dob: string): string => {
   if (!dob) return MISSING_VALUE
