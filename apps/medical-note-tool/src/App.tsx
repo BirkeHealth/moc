@@ -117,16 +117,37 @@ const PRIORITY_STYLES: Record<SmsPriority, string> = {
 
 const MISSING_VALUE = '—'
 const TEMPORARY_ACCESS_CODE = 'MOC0813'
+const RINGCENTRAL_API_URL = 'https://platform.ringcentral.com'
 const fieldClassName = 'w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm outline-none transition focus:border-sky-400 focus:ring-2 focus:ring-sky-100'
 const buttonPrimaryClassName = 'inline-flex items-center justify-center rounded-md border border-sky-700 bg-sky-700 px-3 py-2 text-sm font-medium text-white transition hover:bg-sky-800'
 const buttonSecondaryClassName = 'inline-flex items-center justify-center rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50'
 
 const formatToday = () => new Date().toISOString().slice(0, 10)
+const getEntryNoun = (count: number) => (count === 1 ? 'entry' : 'entries')
+const getFirstName = (name: string) => {
+  const [firstName] = name.trim().split(/\s+/)
+  return firstName || 'there'
+}
 const formatAccountCode = (value: string) => {
   const digits = value.replace(/\D/g, '').slice(0, 4)
   return digits ? `ACC-${digits}` : ''
 }
 const mapNotePriorityToSmsPriority = (value: string): SmsPriority => (value === 'Rush' ? 'High' : 'Medium')
+const normalizePhoneNumber = (raw: string) => {
+  if (!raw.trim()) return ''
+  const normalized = raw.trim().replace(/[^\d+]/g, '')
+  if (/^\+1\d{10}$/.test(normalized)) return normalized
+  if (/^1\d{10}$/.test(normalized)) return `+${normalized}`
+  if (/^\d{10}$/.test(normalized)) return `+1${normalized}`
+  return ''
+}
+const buildInitialSmsMessage = (firstName: string, client: string, prescriber: string) =>
+  `Hi ${firstName},\n\n` +
+  `This is MyOnlineConsultation. We will review your prescription from the order you placed with ${client || MISSING_VALUE}. For questions regarding tracking or shipping ETA, please contact ${client || MISSING_VALUE}. Our team will communicate with you if you have medication-related questions.\n\n` +
+  `Your provider, ${prescriber || MISSING_VALUE}, needs to review your prescription with you. Please reply "YES" to proceed. Your Personal Health Information is protected under HIPAA.\n` +
+  'If you have any questions about your medication, feel free to send them here.'
+const buildFollowUpSmsMessage = () =>
+  'Congratulations your Prescription has been approved! IMPORTANT: If you have any questions regarding the medication you will be prescribed, please feel free to send us any questions here. As part of your health goals, do you have a specific target or outcome you are hoping to achieve?'
 
 const getAge = (dob: string): string => {
   if (!dob) return MISSING_VALUE
@@ -284,6 +305,11 @@ function SmsTableTool({ onBackToTools, rows, setRows }: { onBackToTools: () => v
   const [search, setSearch] = useState('')
   const [filterStatus, setFilterStatus] = useState<SmsStatus | ''>('')
   const [filterPriority, setFilterPriority] = useState<SmsPriority | ''>('')
+  const [smsToken, setSmsToken] = useState('')
+  const [showSmsToken, setShowSmsToken] = useState(false)
+  const [fromNumber, setFromNumber] = useState('')
+  const [smsFeedback, setSmsFeedback] = useState('')
+  const [isSending, setIsSending] = useState(false)
   const nextIdRef = useRef(Math.max(0, ...rows.map((row) => row.id)) + 1)
 
   const filtered = useMemo(() => {
@@ -314,6 +340,104 @@ function SmsTableTool({ onBackToTools, rows, setRows }: { onBackToTools: () => v
 
   const deleteRow = (id: number) => {
     setRows((prev) => prev.filter((row) => row.id !== id))
+  }
+
+  const hasValidSmsCredentials = () => {
+    const isValid = Boolean(smsToken.trim()) && Boolean(normalizePhoneNumber(fromNumber))
+    if (!isValid) {
+      setSmsFeedback('Enter RingCentral access token and a valid from number before sending.')
+    }
+    return isValid
+  }
+
+  const sendSms = async (to: string, text: string) => {
+    const normalizedFrom = normalizePhoneNumber(fromNumber)
+    const normalizedToken = smsToken.trim()
+    if (!normalizedToken || !normalizedFrom) return false
+    try {
+      const response = await fetch(`${RINGCENTRAL_API_URL}/restapi/v1.0/account/~/extension/~/sms`, {
+        method: 'POST',
+        headers: {
+          Authorization: 'Bearer ' + normalizedToken,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          from: { phoneNumber: normalizedFrom },
+          to: [{ phoneNumber: to }],
+          text,
+        }),
+      })
+      return response.ok
+    } catch {
+      console.error('RingCentral SMS send failed')
+      return false
+    }
+  }
+
+  const sendConsultationRequired = async () => {
+    if (!hasValidSmsCredentials()) return
+    setIsSending(true)
+    setSmsFeedback('')
+    try {
+      const updates = new Map<number, SmsStatus>()
+      let sentCount = 0
+      let failedCount = 0
+      for (const row of rows) {
+        if (row.status !== 'Consultation Required') continue
+        const phone = normalizePhoneNumber(row.phone)
+        if (!phone) {
+          updates.set(row.id, 'Text failed')
+          failedCount += 1
+          continue
+        }
+        const sent = await sendSms(phone, buildInitialSmsMessage(getFirstName(row.patient), row.account, row.prescriber))
+        if (sent) {
+          updates.set(row.id, 'Notified')
+          sentCount += 1
+        } else {
+          updates.set(row.id, 'Text failed')
+          failedCount += 1
+        }
+      }
+      setRows((prev) => prev.map((row) => (updates.has(row.id) ? { ...row, status: updates.get(row.id)! } : row)))
+      const processedCount = sentCount + failedCount
+      setSmsFeedback(`Processed ${processedCount} consultation-required ${getEntryNoun(processedCount)} (sent: ${sentCount}, failed: ${failedCount}).`)
+    } finally {
+      setIsSending(false)
+    }
+  }
+
+  const sendFollowUpTexts = async () => {
+    if (!hasValidSmsCredentials()) return
+    setIsSending(true)
+    setSmsFeedback('')
+    try {
+      const updates = new Map<number, SmsStatus>()
+      let sentCount = 0
+      let failedCount = 0
+      for (const row of rows) {
+        if (row.status !== 'Replied Yes') continue
+        const phone = normalizePhoneNumber(row.phone)
+        if (!phone) {
+          updates.set(row.id, 'Text failed')
+          failedCount += 1
+          continue
+        }
+        const sent = await sendSms(phone, buildFollowUpSmsMessage())
+        if (sent) {
+          updates.set(row.id, '2nd Text Sent')
+          sentCount += 1
+        } else {
+          updates.set(row.id, 'Text failed')
+          failedCount += 1
+        }
+      }
+      setRows((prev) => prev.map((row) => (updates.has(row.id) ? { ...row, status: updates.get(row.id)! } : row)))
+      const processedCount = sentCount + failedCount
+      setSmsFeedback(`Processed ${processedCount} replied-yes ${getEntryNoun(processedCount)} (sent: ${sentCount}, failed: ${failedCount}).`)
+    } finally {
+      setIsSending(false)
+    }
   }
 
   return (
@@ -350,6 +474,39 @@ function SmsTableTool({ onBackToTools, rows, setRows }: { onBackToTools: () => v
           </select>
           <input type="text" placeholder="Search patient or prescriber…" value={search} onChange={(event) => setSearch(event.target.value)} className={`${fieldClassName} w-full sm:ml-auto sm:max-w-xs`} />
         </div>
+
+        <div className="mt-3 grid gap-2 lg:grid-cols-[minmax(220px,1fr)_minmax(200px,220px)_auto_auto]">
+          <div className="flex gap-2">
+            <input
+              type={showSmsToken ? 'text' : 'password'}
+              placeholder="RingCentral access token"
+              value={smsToken}
+              onChange={(event) => setSmsToken(event.target.value)}
+              autoComplete="new-password"
+              spellCheck={false}
+              data-form-type="other"
+              className={fieldClassName}
+            />
+            <button type="button" className={buttonSecondaryClassName} onClick={() => setShowSmsToken((current) => !current)}>
+              {showSmsToken ? 'Hide' : 'Show'}
+            </button>
+          </div>
+          <input
+            type="tel"
+            placeholder="From number (+1##########)"
+            value={fromNumber}
+            onChange={(event) => setFromNumber(event.target.value)}
+            className={fieldClassName}
+          />
+          <button type="button" className={buttonPrimaryClassName} onClick={sendConsultationRequired} disabled={isSending}>
+            Send Consultation Required
+          </button>
+          <button type="button" className={buttonSecondaryClassName} onClick={sendFollowUpTexts} disabled={isSending}>
+            Send 2nd Text Follow-up
+          </button>
+        </div>
+        <p className="mt-2 text-xs text-slate-500">Token and from number are kept in memory for this page load only.</p>
+        {smsFeedback && <p className="mt-2 text-sm text-slate-600" role="status" aria-live="polite">{smsFeedback}</p>}
 
         <div className="mt-4 overflow-x-auto overflow-y-hidden rounded-lg border border-slate-200">
           <table className="w-full min-w-[900px] table-auto text-left text-xs text-slate-700">
