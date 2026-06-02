@@ -227,10 +227,10 @@ const INITIAL_SMS_TEMPLATES: SmsTemplates = {
 }
 
 const buildConsultationMessage = (template: string, firstName: string, client: string, prescriber: string) =>
-  fillTemplate(template, { firstName: firstName || 'there', client: client || MISSING_VALUE, prescriber: prescriber || MISSING_VALUE })
+  fillTemplate(template, { firstName, client, prescriber })
 
 const buildCompletedMessage = (template: string, firstName: string) =>
-  fillTemplate(template, { firstName: firstName || 'there' })
+  fillTemplate(template, { firstName })
 
 const getAge = (dob: string): string => {
   if (!dob) return MISSING_VALUE
