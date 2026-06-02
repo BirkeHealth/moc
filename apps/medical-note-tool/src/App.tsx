@@ -150,7 +150,7 @@ const sanitizeSmsErrorMessage = (value: string) =>
     .replace(/Bearer\s+[A-Za-z0-9\-._~+/]+=*/gi, '******')
     .replace(/\+?\d[\d\s().-]{8,}\d/g, (match) => {
       const digits = match.replace(/\D/g, '')
-      return digits.length >= 4 ? `***${digits.slice(-4)}` : '[redacted]'
+      return digits.length >= 10 ? `***${digits.slice(-4)}` : '[redacted]'
     })
     .replace(/\s+/g, ' ')
     .trim()
