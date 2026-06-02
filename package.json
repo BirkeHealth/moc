@@ -1,0 +1,12 @@
+{
+  "name": "moc",
+  "private": true,
+  "version": "0.0.0",
+  "scripts": {
+    "build": "npm install --prefix apps/medical-note-tool && npm run build --prefix apps/medical-note-tool && npm install --prefix apps/api && npm run build --prefix apps/api",
+    "start": "node apps/api/dist/index.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
