@@ -86,14 +86,20 @@ const app = express()
 // Apply CORS only when an explicit allowlist is configured. In development the
 // Vite proxy forwards /api requests from the frontend so no CORS header is
 // required. In production, set CORS_ORIGIN to the deployed frontend URL(s).
+console.log('CORS_ORIGIN raw:', CORS_ORIGIN)
+
 if (CORS_ORIGIN) {
   const allowedOrigins = CORS_ORIGIN.split(',').map((o) => o.trim()).filter(Boolean)
+  console.log('Allowed CORS origins:', allowedOrigins)
   app.use(
     cors({
       origin: allowedOrigins,
       methods: ['POST', 'GET', 'OPTIONS'],
+      allowedHeaders: ['Content-Type', 'Authorization'],
     }),
   )
+} else {
+  console.warn('CORS is disabled because CORS_ORIGIN is not set')
 }
 app.use(express.json())
 
