@@ -47,6 +47,10 @@ type SmsRow = {
   phone: string
 }
 
+type SmsSendResult =
+  | { ok: true }
+  | { ok: false; error: string }
+
 const ACCOUNT_OPTIONS = ['DORAL ACUPUNCTURE', 'HELIMEDS', 'PEAKS CURATIVE', 'CLINIC SECRET', 'TRUE LIO', 'WHITECOAT MD']
 const PRESCRIBER_OPTIONS = ['ALBERTO NUNEZ PINA', 'YADIRA JEAN-LOUIS', 'LUK JEAN-LOUIS', 'EMILIO LUIS GONZALEZ', 'CHARLES SAROSY', 'ELIAZER MORGAN']
 const MEDICATION_OPTIONS = ['OZEMPIC/WAGOVY', 'ZEPBOUND/MONJAURO']
@@ -140,6 +144,59 @@ const normalizePhoneNumber = (raw: string) => {
   if (/^1\d{10}$/.test(normalized)) return `+${normalized}`
   if (/^\d{10}$/.test(normalized)) return `+1${normalized}`
   return ''
+}
+const sanitizeSmsErrorMessage = (value: string) =>
+  value
+    .replace(/Bearer\s+[A-Za-z0-9\-._~+/]+=*/gi, '******')
+    .replace(/\+?\d[\d\s().-]{8,}\d/g, (match) => {
+      const digits = match.replace(/\D/g, '')
+      return digits.length >= 10 ? `***${digits.slice(-4)}` : '[redacted]'
+    })
+    .replace(/\s+/g, ' ')
+    .trim()
+const getSmsApiErrorDetail = (raw: string) => {
+  const trimmed = raw.trim()
+  if (!trimmed) return ''
+  try {
+    const parsed = JSON.parse(trimmed) as {
+      message?: unknown
+      error_description?: unknown
+      description?: unknown
+      errors?: unknown
+    }
+    const details: string[] = []
+    const pushDetail = (value: unknown) => {
+      if (typeof value === 'string' && value.trim()) details.push(value.trim())
+    }
+    pushDetail(parsed.message)
+    pushDetail(parsed.error_description)
+    pushDetail(parsed.description)
+    if (Array.isArray(parsed.errors)) {
+      parsed.errors.forEach((entry) => {
+        if (typeof entry === 'string') {
+          pushDetail(entry)
+          return
+        }
+        if (entry && typeof entry === 'object') {
+          const record = entry as Record<string, unknown>
+          pushDetail(record.message)
+          pushDetail(record.errorCode)
+          pushDetail(record.parameterName)
+        }
+      })
+    }
+    return sanitizeSmsErrorMessage(Array.from(new Set(details)).join('. '))
+  } catch {
+    return sanitizeSmsErrorMessage(trimmed)
+  }
+}
+const getSmsRowLabel = (row: SmsRow) => row.patient.trim() || `Row ${row.id}`
+const getInvalidPhoneMessage = () => 'Invalid phone number. Enter a 10-digit US number or +1 number.'
+const formatSmsFailureDetails = (details: string[]) => {
+  if (!details.length) return ''
+  const visibleDetails = details.slice(0, 3)
+  const remaining = details.length - visibleDetails.length
+  return `Failures: ${visibleDetails.join(' ')}${remaining > 0 ? ` +${remaining} more.` : ''}`
 }
 const buildInitialSmsMessage = (firstName: string, client: string, prescriber: string) =>
   `Hi ${firstName},\n\n` +
@@ -344,9 +401,17 @@ function SmsTableTool({ onBackToTools, rows, setRows }: { onBackToTools: () => v
   }
 
   const hasValidSmsCredentials = () => {
-    const isValid = Boolean(smsToken.trim()) && Boolean(normalizePhoneNumber(fromNumber))
+    const hasToken = Boolean(smsToken.trim())
+    const hasFromNumber = Boolean(normalizePhoneNumber(fromNumber))
+    const isValid = hasToken && hasFromNumber
     if (!isValid) {
-      setSmsFeedback('Enter RingCentral access token and a valid from number before sending.')
+      if (!hasToken && !hasFromNumber) {
+        setSmsFeedback('Enter a RingCentral access token and a valid +1 from number before sending.')
+      } else if (!hasToken) {
+        setSmsFeedback('Enter a RingCentral access token before sending.')
+      } else {
+        setSmsFeedback('Enter a valid +1 from number before sending.')
+      }
     }
     return isValid
   }
@@ -354,7 +419,9 @@ function SmsTableTool({ onBackToTools, rows, setRows }: { onBackToTools: () => v
   const sendSms = async (to: string, text: string) => {
     const normalizedFrom = normalizePhoneNumber(fromNumber)
     const normalizedToken = smsToken.trim()
-    if (!normalizedToken || !normalizedFrom) return false
+    if (!normalizedToken || !normalizedFrom) {
+      return { ok: false, error: 'Missing RingCentral credentials. Enter a current token and a valid +1 from number.' } satisfies SmsSendResult
+    }
     try {
       const response = await fetch(`${RINGCENTRAL_API_URL}/restapi/v1.0/account/~/extension/~/sms`, {
         method: 'POST',
@@ -368,78 +435,101 @@ function SmsTableTool({ onBackToTools, rows, setRows }: { onBackToTools: () => v
           text,
         }),
       })
-      return response.ok
+      if (response.ok) return { ok: true } satisfies SmsSendResult
+
+      const detail = getSmsApiErrorDetail(await response.text())
+      if (response.status === 401) {
+        return {
+          ok: false,
+          error: `Invalid RingCentral credentials. Confirm the access token is current.${detail ? ` ${detail}` : ''}`,
+        } satisfies SmsSendResult
+      }
+      if (response.status === 403) {
+        return {
+          ok: false,
+          error: `RingCentral denied permission to send from this number or extension. Confirm the from number is enabled for the current account.${detail ? ` ${detail}` : ''}`,
+        } satisfies SmsSendResult
+      }
+      return {
+        ok: false,
+        error: `RingCentral rejected the message (${response.status}${response.statusText ? ` ${response.statusText}` : ''}).${detail ? ` ${detail}` : ''}`,
+      } satisfies SmsSendResult
     } catch {
       console.error('RingCentral SMS send failed')
-      return false
+      return { ok: false, error: 'Unable to reach RingCentral. Check your connection and try again.' } satisfies SmsSendResult
     }
   }
 
-  const sendConsultationRequired = async () => {
+  const processSmsRows = async ({
+    eligibleStatus,
+    sentStatus,
+    actionLabel,
+    emptyMessage,
+    buildMessage,
+  }: {
+    eligibleStatus: SmsStatus
+    sentStatus: SmsStatus
+    actionLabel: string
+    emptyMessage: string
+    buildMessage: (row: SmsRow) => string
+  }) => {
     if (!hasValidSmsCredentials()) return
+    const eligibleRows = rows.filter((row) => row.status === eligibleStatus)
+    if (eligibleRows.length === 0) {
+      setSmsFeedback(emptyMessage)
+      return
+    }
     setIsSending(true)
     setSmsFeedback('')
     try {
       const updates = new Map<number, SmsStatus>()
       let sentCount = 0
       let failedCount = 0
-      for (const row of rows) {
-        if (row.status !== 'Consultation Required') continue
+      const failureDetails: string[] = []
+      for (const row of eligibleRows) {
         const phone = normalizePhoneNumber(row.phone)
         if (!phone) {
           updates.set(row.id, 'Text failed')
           failedCount += 1
+          failureDetails.push(`${getSmsRowLabel(row)}: ${getInvalidPhoneMessage()}`)
           continue
         }
-        const sent = await sendSms(phone, buildInitialSmsMessage(getFirstName(row.patient), row.account, row.prescriber))
-        if (sent) {
-          updates.set(row.id, 'Notified')
+        const result = await sendSms(phone, buildMessage(row))
+        if (result.ok) {
+          updates.set(row.id, sentStatus)
           sentCount += 1
         } else {
           updates.set(row.id, 'Text failed')
           failedCount += 1
+          failureDetails.push(`${getSmsRowLabel(row)}: ${result.error}`)
         }
       }
       setRows((prev) => prev.map((row) => (updates.has(row.id) ? { ...row, status: updates.get(row.id)! } : row)))
       const processedCount = sentCount + failedCount
-      setSmsFeedback(`Processed ${processedCount} consultation-required ${getEntryNoun(processedCount)} (sent: ${sentCount}, failed: ${failedCount}).`)
+      const failureSummary = formatSmsFailureDetails(failureDetails)
+      setSmsFeedback(`Processed ${processedCount} ${actionLabel} ${getEntryNoun(processedCount)} (sent: ${sentCount}, failed: ${failedCount}).${failureSummary ? ` ${failureSummary}` : ''}`)
     } finally {
       setIsSending(false)
     }
   }
 
-  const sendFollowUpTexts = async () => {
-    if (!hasValidSmsCredentials()) return
-    setIsSending(true)
-    setSmsFeedback('')
-    try {
-      const updates = new Map<number, SmsStatus>()
-      let sentCount = 0
-      let failedCount = 0
-      for (const row of rows) {
-        if (row.status !== 'Replied Yes') continue
-        const phone = normalizePhoneNumber(row.phone)
-        if (!phone) {
-          updates.set(row.id, 'Text failed')
-          failedCount += 1
-          continue
-        }
-        const sent = await sendSms(phone, buildFollowUpSmsMessage())
-        if (sent) {
-          updates.set(row.id, '2nd Text Sent')
-          sentCount += 1
-        } else {
-          updates.set(row.id, 'Text failed')
-          failedCount += 1
-        }
-      }
-      setRows((prev) => prev.map((row) => (updates.has(row.id) ? { ...row, status: updates.get(row.id)! } : row)))
-      const processedCount = sentCount + failedCount
-      setSmsFeedback(`Processed ${processedCount} replied-yes ${getEntryNoun(processedCount)} (sent: ${sentCount}, failed: ${failedCount}).`)
-    } finally {
-      setIsSending(false)
-    }
-  }
+  const sendConsultationRequired = async () =>
+    processSmsRows({
+      eligibleStatus: 'Consultation Required',
+      sentStatus: 'Notified',
+      actionLabel: 'consultation-required',
+      emptyMessage: 'No consultation-required entries were found to process.',
+      buildMessage: (row) => buildInitialSmsMessage(getFirstName(row.patient), row.account, row.prescriber),
+    })
+
+  const sendFollowUpTexts = async () =>
+    processSmsRows({
+      eligibleStatus: 'Replied Yes',
+      sentStatus: '2nd Text Sent',
+      actionLabel: 'replied-yes',
+      emptyMessage: 'No replied-yes entries were found to process.',
+      buildMessage: () => buildFollowUpSmsMessage(),
+    })
 
   return (
     <main className="min-h-screen w-full px-3 py-4 sm:px-4">
