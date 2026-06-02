@@ -371,94 +371,111 @@ function SmsTableTool({ onBackToTools, rows, setRows }: { onBackToTools: () => v
   }
 
   return (
-    <main className="app sms-compact-page">
-      <div className="app-header sms-compact-header">
-        <div>
-          <h1>SMS Workflow Table</h1>
-          <p className="privacy">Compact spreadsheet view for fast editing.</p>
-        </div>
-        <div className="sms-header-actions">
-          <button type="button" className="secondary" onClick={onBackToTools}>Back to tools</button>
-          <button type="button" onClick={handleAddEntry}>Add row</button>
-        </div>
+    <main className="app sms-compact-page sms-frame-reference">
+      <div className="sms-topnav-spacer" />
+      <div className="sms-main-shell">
+        <aside className="sms-left-rail" aria-hidden="true" />
+        <section className="sms-content-region">
+          <div className="app-header sms-compact-header tight">
+            <div>
+              <h1>SMS Workflow Table</h1>
+              <p className="privacy">Compact spreadsheet view for fast editing.</p>
+            </div>
+            <div className="sms-header-actions">
+              <button type="button" className="secondary" onClick={onBackToTools}>Back to tools</button>
+              <button type="button" onClick={handleAddEntry}>Add row</button>
+            </div>
+          </div>
+
+          <section className="sms-compact-controls tight">
+            <div className="sms-stat-strip">
+              <span>Total <strong>{stats.total}</strong></span>
+              <span>Pending <strong>{stats.pending}</strong></span>
+              <span>Approved <strong>{stats.approved}</strong></span>
+              <span>High <strong>{stats.highPriority}</strong></span>
+            </div>
+            <div className="sms-filter-strip tight">
+              <input
+                className="sms-search-input compact"
+                placeholder="Search patient, account, or prescriber"
+                value={filters.search}
+                onChange={(event) => setFilters((current) => ({ ...current, search: event.target.value }))}
+              />
+              <select value={filters.status} onChange={(event) => setFilters((current) => ({ ...current, status: event.target.value as FilterState['status'] }))}>
+                <option value="">All Statuses</option>
+                {SMS_STATUS_OPTIONS.map((status) => <option key={status} value={status}>{status}</option>)}
+              </select>
+              <select value={filters.priority} onChange={(event) => setFilters((current) => ({ ...current, priority: event.target.value as FilterState['priority'] }))}>
+                <option value="">All Priorities</option>
+                {SMS_PRIORITY_OPTIONS.map((priority) => <option key={priority} value={priority}>{priority}</option>)}
+              </select>
+            </div>
+          </section>
+
+          <section className="sms-sheet-card tight">
+            <table className="sms-sheet-table sms-sheet-table-fixed" aria-label="SMS workflow spreadsheet">
+              <colgroup>
+                <col style={{ width: '108px' }} />
+                <col style={{ width: '156px' }} />
+                <col style={{ width: '126px' }} />
+                <col style={{ width: '158px' }} />
+                <col style={{ width: '134px' }} />
+                <col style={{ width: '92px' }} />
+                <col style={{ width: '120px' }} />
+                <col style={{ width: '1%' }} />
+                <col style={{ width: '42px' }} />
+              </colgroup>
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Patient</th>
+                  <th>Account</th>
+                  <th>Prescriber</th>
+                  <th>Status</th>
+                  <th>Priority</th>
+                  <th>Phone</th>
+                  <th>Note</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredRows.map((row) => (
+                  <tr key={row.id}>
+                    <td><input type="date" value={row.dateEntered} onChange={handleInputChange(row.id, 'dateEntered')} /></td>
+                    <td><input ref={(node) => { patientInputRefs.current[row.id] = node }} value={row.patient} onChange={handleInputChange(row.id, 'patient')} /></td>
+                    <td>
+                      <select value={row.account} onChange={handleInputChange(row.id, 'account')}>
+                        <option value="">Select</option>
+                        {ACCOUNT_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}
+                      </select>
+                    </td>
+                    <td>
+                      <select value={row.prescriber} onChange={handleInputChange(row.id, 'prescriber')}>
+                        <option value="">Select</option>
+                        {PRESCRIBER_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}
+                      </select>
+                    </td>
+                    <td>
+                      <select value={row.status} onChange={handleInputChange(row.id, 'status')}>
+                        {SMS_STATUS_OPTIONS.map((status) => <option key={status} value={status}>{status}</option>)}
+                      </select>
+                    </td>
+                    <td>
+                      <select value={row.priority} onChange={handleInputChange(row.id, 'priority')}>
+                        {SMS_PRIORITY_OPTIONS.map((priority) => <option key={priority} value={priority}>{priority}</option>)}
+                      </select>
+                    </td>
+                    <td><input value={row.phone} onChange={handleInputChange(row.id, 'phone')} /></td>
+                    <td><input value={row.note} onChange={handleInputChange(row.id, 'note')} /></td>
+                    <td className="sms-delete-cell"><button type="button" className="sms-delete-button compact" onClick={() => handleDeleteRow(row.id)}>✕</button></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {filteredRows.length === 0 && <div className="sms-empty-state">No rows match your filters.</div>}
+          </section>
+        </section>
       </div>
-
-      <section className="sms-compact-controls">
-        <div className="sms-stat-strip">
-          <span>Total <strong>{stats.total}</strong></span>
-          <span>Pending <strong>{stats.pending}</strong></span>
-          <span>Approved <strong>{stats.approved}</strong></span>
-          <span>High <strong>{stats.highPriority}</strong></span>
-        </div>
-        <div className="sms-filter-strip">
-          <input
-            className="sms-search-input compact"
-            placeholder="Search patient, account, or prescriber"
-            value={filters.search}
-            onChange={(event) => setFilters((current) => ({ ...current, search: event.target.value }))}
-          />
-          <select value={filters.status} onChange={(event) => setFilters((current) => ({ ...current, status: event.target.value as FilterState['status'] }))}>
-            <option value="">All Statuses</option>
-            {SMS_STATUS_OPTIONS.map((status) => <option key={status} value={status}>{status}</option>)}
-          </select>
-          <select value={filters.priority} onChange={(event) => setFilters((current) => ({ ...current, priority: event.target.value as FilterState['priority'] }))}>
-            <option value="">All Priorities</option>
-            {SMS_PRIORITY_OPTIONS.map((priority) => <option key={priority} value={priority}>{priority}</option>)}
-          </select>
-        </div>
-      </section>
-
-      <section className="sms-sheet-card">
-        <table className="sms-sheet-table" aria-label="SMS workflow spreadsheet">
-          <thead>
-            <tr>
-              <th>Date</th>
-              <th>Patient</th>
-              <th>Account</th>
-              <th>Prescriber</th>
-              <th>Status</th>
-              <th>Priority</th>
-              <th>Phone</th>
-              <th>Note</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredRows.map((row) => (
-              <tr key={row.id}>
-                <td><input type="date" value={row.dateEntered} onChange={handleInputChange(row.id, 'dateEntered')} /></td>
-                <td><input ref={(node) => { patientInputRefs.current[row.id] = node }} value={row.patient} onChange={handleInputChange(row.id, 'patient')} /></td>
-                <td>
-                  <select value={row.account} onChange={handleInputChange(row.id, 'account')}>
-                    <option value="">Select</option>
-                    {ACCOUNT_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}
-                  </select>
-                </td>
-                <td>
-                  <select value={row.prescriber} onChange={handleInputChange(row.id, 'prescriber')}>
-                    <option value="">Select</option>
-                    {PRESCRIBER_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}
-                  </select>
-                </td>
-                <td>
-                  <select value={row.status} onChange={handleInputChange(row.id, 'status')}>
-                    {SMS_STATUS_OPTIONS.map((status) => <option key={status} value={status}>{status}</option>)}
-                  </select>
-                </td>
-                <td>
-                  <select value={row.priority} onChange={handleInputChange(row.id, 'priority')}>
-                    {SMS_PRIORITY_OPTIONS.map((priority) => <option key={priority} value={priority}>{priority}</option>)}
-                  </select>
-                </td>
-                <td><input value={row.phone} onChange={handleInputChange(row.id, 'phone')} /></td>
-                <td><input value={row.note} onChange={handleInputChange(row.id, 'note')} /></td>
-                <td className="sms-delete-cell"><button type="button" className="sms-delete-button compact" onClick={() => handleDeleteRow(row.id)}>✕</button></td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        {filteredRows.length === 0 && <div className="sms-empty-state">No rows match your filters.</div>}
-      </section>
     </main>
   )
 }
