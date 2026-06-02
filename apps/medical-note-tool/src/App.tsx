@@ -26,7 +26,14 @@ type FormData = {
   priority: string
 }
 
-type SmsStatus = 'Pending Consultation' | 'Under Review' | 'Approved' | 'Denied'
+type SmsStatus =
+  | 'Consultation Required'
+  | 'Notified'
+  | '2nd Text Sent'
+  | 'Replied Yes'
+  | 'Replied 2nd Text'
+  | 'Completed Visit'
+  | 'Text failed'
 type SmsPriority = 'High' | 'Medium' | 'Low'
 
 type SmsRow = {
@@ -44,7 +51,7 @@ const ACCOUNT_OPTIONS = ['DORAL ACUPUNCTURE', 'HELIMEDS', 'PEAKS CURATIVE', 'CLI
 const PRESCRIBER_OPTIONS = ['ALBERTO NUNEZ PINA', 'YADIRA JEAN-LOUIS', 'LUK JEAN-LOUIS', 'EMILIO LUIS GONZALEZ', 'CHARLES SAROSY', 'ELIAZER MORGAN']
 const MEDICATION_OPTIONS = ['OZEMPIC/WAGOVY', 'ZEPBOUND/MONJAURO']
 const NOTE_PRIORITY_OPTIONS = ['Normal', 'Rush']
-const STATUSES: SmsStatus[] = ['Pending Consultation', 'Under Review', 'Approved', 'Denied']
+const STATUSES: SmsStatus[] = ['Consultation Required', 'Notified', '2nd Text Sent', 'Replied Yes', 'Replied 2nd Text', 'Completed Visit', 'Text failed']
 const PRIORITIES: SmsPriority[] = ['High', 'Medium', 'Low']
 
 const INITIAL_FORM: FormData = {
@@ -52,9 +59,9 @@ const INITIAL_FORM: FormData = {
 }
 
 const INITIAL_SMS_ROWS: SmsRow[] = [
-  { id: 1, date: '2026-05-28', patient: 'Maria Torres', account: 'ACC-1042', prescriber: 'Dr. Chen', status: 'Pending Consultation', priority: 'High', phone: '(305) 555-0182' },
-  { id: 2, date: '2026-05-29', patient: 'James Holloway', account: 'ACC-0891', prescriber: 'Dr. Patel', status: 'Approved', priority: 'Low', phone: '(786) 555-0341' },
-  { id: 3, date: '2026-05-30', patient: 'Sandra Kim', account: 'ACC-1107', prescriber: 'Dr. Reyes', status: 'Under Review', priority: 'Medium', phone: '(954) 555-0029' },
+  { id: 1, date: '2026-05-28', patient: 'Maria Torres', account: 'ACC-1042', prescriber: 'Dr. Chen', status: 'Consultation Required', priority: 'High', phone: '(305) 555-0182' },
+  { id: 2, date: '2026-05-29', patient: 'James Holloway', account: 'ACC-0891', prescriber: 'Dr. Patel', status: 'Completed Visit', priority: 'Low', phone: '(786) 555-0341' },
+  { id: 3, date: '2026-05-30', patient: 'Sandra Kim', account: 'ACC-1107', prescriber: 'Dr. Reyes', status: 'Notified', priority: 'Medium', phone: '(954) 555-0029' },
 ]
 
 const MEDICAL_NOTE_TEMPLATE = `The patient {{PATIENT NAME}} is a {{AGE}} year old {{GENDER}} with a PMH of {{PMH}} seeking care for Weight Loss. Body Mass Index is {{BMI}}. Patient {{HAS_WEIGHT_LOSS_PROGRAM}} tried any weight loss programs. The patient {{HAS_GLP1}} tried any GLP1 medications in the past. The patient’s last dose of GLP1 medication or any weight loss related medication generic or non generic is {{LAST DOSE}}
@@ -93,10 +100,13 @@ Recommend drinking sufficient water and working on adhering to a balanced diet w
 Will follow up with patient in 3-4 weeks to assess response and side effects.`
 
 const STATUS_STYLES: Record<SmsStatus, string> = {
-  'Pending Consultation': 'border-amber-200 bg-amber-50 text-amber-700',
-  'Under Review': 'border-sky-200 bg-sky-50 text-sky-700',
-  Approved: 'border-emerald-200 bg-emerald-50 text-emerald-700',
-  Denied: 'border-rose-200 bg-rose-50 text-rose-700',
+  'Consultation Required': 'border-amber-200 bg-amber-50 text-amber-700',
+  Notified: 'border-sky-200 bg-sky-50 text-sky-700',
+  '2nd Text Sent': 'border-indigo-200 bg-indigo-50 text-indigo-700',
+  'Replied Yes': 'border-emerald-200 bg-emerald-50 text-emerald-700',
+  'Replied 2nd Text': 'border-violet-200 bg-violet-50 text-violet-700',
+  'Completed Visit': 'border-teal-200 bg-teal-50 text-teal-700',
+  'Text failed': 'border-rose-200 bg-rose-50 text-rose-700',
 }
 
 const PRIORITY_STYLES: Record<SmsPriority, string> = {
@@ -187,7 +197,7 @@ function MedicalNoteTool({ onBackToTools, onAddSmsRow }: { onBackToTools: () => 
   const handleSmsAndCopy = async () => {
     try {
       await navigator.clipboard.writeText(noteText)
-      onAddSmsRow({ id: Date.now(), date: formatToday(), patient: formData.patientName, account: formatAccountCode(formData.account), prescriber: formData.prescriber || '', status: 'Pending Consultation', priority: mapNotePriorityToSmsPriority(formData.priority), phone: formData.phone })
+      onAddSmsRow({ id: Date.now(), date: formatToday(), patient: formData.patientName, account: formatAccountCode(formData.account), prescriber: formData.prescriber || '', status: 'Consultation Required', priority: mapNotePriorityToSmsPriority(formData.priority), phone: formData.phone })
       setCopyFeedback('Note copied and added to SMS table.')
     } catch {
       setCopyFeedback('Unable to copy note. Please copy manually from the preview.')
@@ -288,14 +298,14 @@ function SmsTableTool({ onBackToTools, rows, setRows }: { onBackToTools: () => v
 
   const stats = useMemo(() => ({
     total: rows.length,
-    pending: rows.filter((row) => row.status === 'Pending Consultation').length,
-    approved: rows.filter((row) => row.status === 'Approved').length,
+    consultationRequired: rows.filter((row) => row.status === 'Consultation Required').length,
+    completed: rows.filter((row) => row.status === 'Completed Visit').length,
     high: rows.filter((row) => row.priority === 'High').length,
   }), [rows])
 
   const addRow = () => {
     const id = nextIdRef.current++
-    setRows((prev) => [...prev, { id, date: formatToday(), patient: '', account: '', prescriber: '', status: 'Pending Consultation', priority: 'Medium', phone: '' }])
+    setRows((prev) => [...prev, { id, date: formatToday(), patient: '', account: '', prescriber: '', status: 'Consultation Required', priority: 'Medium', phone: '' }])
   }
 
   const updateRow = <K extends keyof SmsRow>(id: number, field: K, value: SmsRow[K]) => {
@@ -321,7 +331,7 @@ function SmsTableTool({ onBackToTools, rows, setRows }: { onBackToTools: () => v
         </div>
 
         <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-          {[{ label: 'Total', value: stats.total }, { label: 'Pending', value: stats.pending }, { label: 'Approved', value: stats.approved }, { label: 'High priority', value: stats.high }].map((item) => (
+          {[{ label: 'Total', value: stats.total }, { label: 'Consultation required', value: stats.consultationRequired }, { label: 'Completed visits', value: stats.completed }, { label: 'High priority', value: stats.high }].map((item) => (
             <div key={item.label} className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
               <p className="text-xs font-medium uppercase tracking-wide text-slate-500">{item.label}</p>
               <p className="mt-1 text-xl font-semibold text-slate-900">{item.value}</p>
