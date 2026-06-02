@@ -2,7 +2,13 @@ import { useMemo, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 
 type YesNo = '' | 'yes' | 'no'
-type ToolSelection = 'medical-note' | 'sms-table' | null
+type ToolSelection = 'medical-note' | 'sms-table' | 'sms-templates' | null
+
+type SmsTemplates = {
+  consultationRequired: string
+  followUp: string
+  completed: string
+}
 
 type FormData = {
   patientName: string
@@ -204,13 +210,27 @@ const formatSmsFailureDetails = (details: string[]) => {
   const remaining = details.length - visibleDetails.length
   return `Failures: ${visibleDetails.join(' ')}${remaining > 0 ? ` +${remaining} more.` : ''}`
 }
-const buildInitialSmsMessage = (firstName: string, client: string, prescriber: string) =>
-  `Hi ${firstName},\n\n` +
-  `This is MyOnlineConsultation. We will review your prescription from the order you placed with ${client || MISSING_VALUE}. For questions regarding tracking or shipping ETA, please contact ${client || MISSING_VALUE}. Our team will communicate with you if you have medication-related questions.\n\n` +
-  `Your provider, ${prescriber || MISSING_VALUE}, needs to review your prescription with you. Please reply "YES" to proceed. Your Personal Health Information is protected under HIPAA.\n` +
+const DEFAULT_CONSULTATION_TEMPLATE =
+  'Hi {{firstName}},\n\n' +
+  'This is MyOnlineConsultation. We will review your prescription from the order you placed with {{client}}. For questions regarding tracking or shipping ETA, please contact {{client}}. Our team will communicate with you if you have medication-related questions.\n\n' +
+  'Your provider, {{prescriber}}, needs to review your prescription with you. Please reply "YES" to proceed. Your Personal Health Information is protected under HIPAA.\n' +
   'If you have any questions about your medication, feel free to send them here.'
-const buildFollowUpSmsMessage = () =>
+const DEFAULT_FOLLOW_UP_TEMPLATE =
   'Congratulations your Prescription has been approved! IMPORTANT: If you have any questions regarding the medication you will be prescribed, please feel free to send us any questions here. As part of your health goals, do you have a specific target or outcome you are hoping to achieve?'
+const DEFAULT_COMPLETED_TEMPLATE =
+  'Hi {{firstName}}, your consultation visit has been completed. Thank you for choosing MyOnlineConsultation. If you have any follow-up questions about your medication or care plan, feel free to reach out here.'
+
+const INITIAL_SMS_TEMPLATES: SmsTemplates = {
+  consultationRequired: DEFAULT_CONSULTATION_TEMPLATE,
+  followUp: DEFAULT_FOLLOW_UP_TEMPLATE,
+  completed: DEFAULT_COMPLETED_TEMPLATE,
+}
+
+const buildConsultationMessage = (template: string, firstName: string, client: string, prescriber: string) =>
+  fillTemplate(template, { firstName, client, prescriber })
+
+const buildCompletedMessage = (template: string, firstName: string) =>
+  fillTemplate(template, { firstName })
 
 const getAge = (dob: string): string => {
   if (!dob) return MISSING_VALUE
@@ -239,6 +259,70 @@ const getYesNoPhrase = (value: YesNo): string => {
 
 const fillTemplate = (template: string, values: Record<string, string>): string =>
   Object.entries(values).reduce((result, [key, value]) => result.replace(new RegExp(`\\{\\{${key}\\}\\}`, 'g'), value || MISSING_VALUE), template)
+
+function SmsTemplatesTool({ onBackToTools, templates, setTemplates }: { onBackToTools: () => void; templates: SmsTemplates; setTemplates: React.Dispatch<React.SetStateAction<SmsTemplates>> }) {
+  const updateTemplate = (key: keyof SmsTemplates, value: string) => {
+    setTemplates((current) => ({ ...current, [key]: value }))
+  }
+
+  const resetTemplate = (key: keyof SmsTemplates, defaultValue: string) => {
+    setTemplates((current) => ({ ...current, [key]: defaultValue }))
+  }
+
+  return (
+    <main className="min-h-screen w-full px-3 py-4 sm:px-4">
+      <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h1 className="text-2xl font-semibold text-slate-900 sm:text-[28px]">SMS Templates</h1>
+            <p className="mt-1 text-sm text-slate-600">Edit the message templates used when sending SMS actions. Changes are kept for this session.</p>
+          </div>
+          <button type="button" className={buttonSecondaryClassName} onClick={onBackToTools}>Back to tools</button>
+        </div>
+
+        <div className="mt-5 grid gap-5">
+          <div className="grid gap-2 rounded-xl border border-slate-200 bg-slate-50 p-4">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <label className="text-sm font-semibold text-slate-800">Process Consultation Required Template</label>
+              <button type="button" className={buttonSecondaryClassName} onClick={() => resetTemplate('consultationRequired', DEFAULT_CONSULTATION_TEMPLATE)}>Reset to default</button>
+            </div>
+            <p className="text-xs text-slate-500">Supports placeholders: <code className="rounded bg-slate-200 px-1 py-0.5">{'{{firstName}}'}</code>, <code className="rounded bg-slate-200 px-1 py-0.5">{'{{client}}'}</code>, <code className="rounded bg-slate-200 px-1 py-0.5">{'{{prescriber}}'}</code></p>
+            <textarea
+              className={`${fieldClassName} min-h-[160px] resize-y font-mono text-xs`}
+              value={templates.consultationRequired}
+              onChange={(event) => updateTemplate('consultationRequired', event.target.value)}
+            />
+          </div>
+
+          <div className="grid gap-2 rounded-xl border border-slate-200 bg-slate-50 p-4">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <label className="text-sm font-semibold text-slate-800">2nd Text Follow Up Template</label>
+              <button type="button" className={buttonSecondaryClassName} onClick={() => resetTemplate('followUp', DEFAULT_FOLLOW_UP_TEMPLATE)}>Reset to default</button>
+            </div>
+            <textarea
+              className={`${fieldClassName} min-h-[120px] resize-y font-mono text-xs`}
+              value={templates.followUp}
+              onChange={(event) => updateTemplate('followUp', event.target.value)}
+            />
+          </div>
+
+          <div className="grid gap-2 rounded-xl border border-slate-200 bg-slate-50 p-4">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <label className="text-sm font-semibold text-slate-800">Completed Text Template</label>
+              <button type="button" className={buttonSecondaryClassName} onClick={() => resetTemplate('completed', DEFAULT_COMPLETED_TEMPLATE)}>Reset to default</button>
+            </div>
+            <p className="text-xs text-slate-500">Supports placeholders: <code className="rounded bg-slate-200 px-1 py-0.5">{'{{firstName}}'}</code></p>
+            <textarea
+              className={`${fieldClassName} min-h-[120px] resize-y font-mono text-xs`}
+              value={templates.completed}
+              onChange={(event) => updateTemplate('completed', event.target.value)}
+            />
+          </div>
+        </div>
+      </section>
+    </main>
+  )
+}
 
 function MedicalNoteTool({ onBackToTools, onAddSmsRow }: { onBackToTools: () => void; onAddSmsRow: (row: SmsRow) => void }) {
   const [formData, setFormData] = useState<FormData>(INITIAL_FORM)
@@ -364,7 +448,7 @@ function MedicalNoteTool({ onBackToTools, onAddSmsRow }: { onBackToTools: () => 
   )
 }
 
-function SmsTableTool({ onBackToTools, rows, setRows }: { onBackToTools: () => void; rows: SmsRow[]; setRows: React.Dispatch<React.SetStateAction<SmsRow[]>> }) {
+function SmsTableTool({ onBackToTools, rows, setRows, templates }: { onBackToTools: () => void; rows: SmsRow[]; setRows: React.Dispatch<React.SetStateAction<SmsRow[]>>; templates: SmsTemplates }) {
   const [search, setSearch] = useState('')
   const [filterStatus, setFilterStatus] = useState<SmsStatus | ''>('')
   const [filterPriority, setFilterPriority] = useState<SmsPriority | ''>('')
@@ -487,7 +571,7 @@ function SmsTableTool({ onBackToTools, rows, setRows }: { onBackToTools: () => v
       sentStatus: 'Notified',
       actionLabel: 'consultation-required',
       emptyMessage: 'No consultation-required entries were found to process.',
-      buildMessage: (row) => buildInitialSmsMessage(getFirstName(row.patient), row.account, row.prescriber),
+      buildMessage: (row) => buildConsultationMessage(templates.consultationRequired, getFirstName(row.patient), row.account, row.prescriber),
     })
 
   const sendFollowUpTexts = async () =>
@@ -496,7 +580,16 @@ function SmsTableTool({ onBackToTools, rows, setRows }: { onBackToTools: () => v
       sentStatus: '2nd Text Sent',
       actionLabel: 'replied-yes',
       emptyMessage: 'No replied-yes entries were found to process.',
-      buildMessage: () => buildFollowUpSmsMessage(),
+      buildMessage: () => templates.followUp,
+    })
+
+  const sendCompletedTexts = async () =>
+    processSmsRows({
+      eligibleStatus: 'Completed Visit',
+      sentStatus: 'Completed Visit',
+      actionLabel: 'completed-visit',
+      emptyMessage: 'No completed-visit entries were found to process.',
+      buildMessage: (row) => buildCompletedMessage(templates.completed, getFirstName(row.patient)),
     })
 
   return (
@@ -547,6 +640,8 @@ function SmsTableTool({ onBackToTools, rows, setRows }: { onBackToTools: () => v
                   await sendConsultationRequired()
                 } else if (action === 'follow-up') {
                   await sendFollowUpTexts()
+                } else if (action === 'completed') {
+                  await sendCompletedTexts()
                 }
               } finally {
                 setSelectedSendAction('')
@@ -558,6 +653,7 @@ function SmsTableTool({ onBackToTools, rows, setRows }: { onBackToTools: () => v
             <option value="">Send Action</option>
             <option value="consultation-required">Process Consultation Required</option>
             <option value="follow-up">2nd Text Follow-up</option>
+            <option value="completed">Completed Text</option>
           </select>
         </div>
         {smsFeedback && <p className="mt-2 text-sm text-slate-600" role="status" aria-live="polite">{smsFeedback}</p>}
@@ -635,6 +731,7 @@ function App() {
   const [isAccessGranted, setIsAccessGranted] = useState(false)
   const [selectedTool, setSelectedTool] = useState<ToolSelection>(null)
   const [smsRows, setSmsRows] = useState<SmsRow[]>(INITIAL_SMS_ROWS)
+  const [smsTemplates, setSmsTemplates] = useState<SmsTemplates>(INITIAL_SMS_TEMPLATES)
 
   const handleAccessSubmit = (event: FormEvent) => {
     event.preventDefault()
@@ -671,6 +768,7 @@ function App() {
           <div className="mt-4 grid gap-2">
             <button type="button" className={buttonPrimaryClassName} onClick={() => setSelectedTool('medical-note')}>Medical Note</button>
             <button type="button" className={buttonSecondaryClassName} onClick={() => setSelectedTool('sms-table')}>SMS TABLE</button>
+            <button type="button" className={buttonSecondaryClassName} onClick={() => setSelectedTool('sms-templates')}>SMS Templates</button>
           </div>
         </section>
       </main>
@@ -681,7 +779,11 @@ function App() {
     return <MedicalNoteTool onBackToTools={() => setSelectedTool(null)} onAddSmsRow={(row) => setSmsRows((current) => [...current, row])} />
   }
 
-  return <SmsTableTool onBackToTools={() => setSelectedTool(null)} rows={smsRows} setRows={setSmsRows} />
+  if (selectedTool === 'sms-templates') {
+    return <SmsTemplatesTool onBackToTools={() => setSelectedTool(null)} templates={smsTemplates} setTemplates={setSmsTemplates} />
+  }
+
+  return <SmsTableTool onBackToTools={() => setSelectedTool(null)} rows={smsRows} setRows={setSmsRows} templates={smsTemplates} />
 }
 
 export default App
