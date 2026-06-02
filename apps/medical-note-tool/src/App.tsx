@@ -1,9 +1,8 @@
-import { useMemo, useState } from 'react'
-import type { FormEvent } from 'react'
 import './App.css'
 
-type YesNo = '' | 'yes' | 'no'
 type ToolSelection = 'medical-note' | 'sms-table' | null
+
+type YesNo = '' | 'yes' | 'no'
 
 type FormData = {
   patientName: string
@@ -27,28 +26,6 @@ type FormData = {
   priority: string
 }
 
-type SmsStatus =
-  | 'Pending Consultation'
-  | 'Approved by prescriber'
-  | 'Notified'
-  | '2nd text sent'
-  | 'Replied to 2nd text'
-  | 'Replied yes'
-  | 'Completed'
-  | 'Text Failed'
-
-type SmsTableRow = {
-  dateEntered: string
-  patientName: string
-  clientAccount: string
-  prescriber: string
-  status: SmsStatus
-  priority: string
-  phoneNumber: string
-  cleanedNumber: string
-  secondTextResponse: string
-}
-
 const ACCOUNT_OPTIONS = [
   'DORAL ACUPUNCTURE',
   'HELIMEDS',
@@ -68,33 +45,7 @@ const PRESCRIBER_OPTIONS = [
 ]
 
 const MEDICATION_OPTIONS = ['OZEMPIC/WAGOVY', 'ZEPBOUND/MONJAURO']
-
 const PRIORITY_OPTIONS = ['Normal', 'Rush']
-
-const SMS_STATUS_OPTIONS: SmsStatus[] = [
-  'Pending Consultation',
-  'Approved by prescriber',
-  'Notified',
-  '2nd text sent',
-  'Replied to 2nd text',
-  'Replied yes',
-  'Completed',
-  'Text Failed',
-]
-
-const INITIAL_SMS_ROW: SmsTableRow = {
-  dateEntered: '',
-  patientName: '',
-  clientAccount: '',
-  prescriber: '',
-  status: 'Pending Consultation',
-  priority: '',
-  phoneNumber: '',
-  cleanedNumber: '',
-  secondTextResponse: '',
-}
-
-const INITIAL_SMS_ROWS: SmsTableRow[] = [{ ...INITIAL_SMS_ROW }]
 
 const INITIAL_FORM: FormData = {
   patientName: '',
@@ -156,16 +107,6 @@ Will follow up with patient in 3-4 weeks to assess response and side effects.`
 const MISSING_VALUE = '—'
 const TEMPORARY_ACCESS_CODE = 'MOC0813'
 
-const formatDateEntered = (): string => {
-  const today = new Date()
-  const month = String(today.getMonth() + 1).padStart(2, '0')
-  const day = String(today.getDate()).padStart(2, '0')
-  const year = String(today.getFullYear())
-  return `${month}/${day}/${year}`
-}
-
-const getCleanedNumber = (phone: string): string => phone.replace(/\D/g, '')
-
 const getAge = (dob: string): string => {
   if (!dob) return MISSING_VALUE
 
@@ -204,490 +145,350 @@ const fillTemplate = (template: string, values: Record<string, string>): string 
     return result.replace(pattern, value || MISSING_VALUE)
   }, template)
 
-type MedicalNoteToolProps = {
-  onBackToTools: () => void
-  onAddSmsRow: (row: SmsTableRow) => void
-}
-
-function MedicalNoteTool({ onBackToTools, onAddSmsRow }: MedicalNoteToolProps) {
-  const [formData, setFormData] = useState<FormData>(INITIAL_FORM)
-  const [copyFeedback, setCopyFeedback] = useState('')
-
-  const noteText = useMemo(() => {
-    const replacements: Record<string, string> = {
-      'PATIENT NAME': formData.patientName || MISSING_VALUE,
-      AGE: getAge(formData.dob),
-      GENDER: formData.gender || MISSING_VALUE,
-      PMH: formData.pmh || MISSING_VALUE,
-      BMI: formData.bmi || MISSING_VALUE,
-      HAS_WEIGHT_LOSS_PROGRAM: getYesNoPhrase(formData.hasWeightLossProgram),
-      HAS_GLP1: getYesNoPhrase(formData.hasGlp1),
-      'LAST DOSE': formData.lastDose || MISSING_VALUE,
-      PSH: formData.psh || MISSING_VALUE,
-      Allergy: formData.allergies || MISSING_VALUE,
-      MEDICATION: formData.medications || MISSING_VALUE,
-      HEIGHT: getHeightInches(formData.heightFt, formData.heightIn),
-      WEIGHT: formData.weight || MISSING_VALUE,
-      'ZEPBOUND/MONJAURO or OZEMPIC/WAGOVY': formData.prescribedMedication || MISSING_VALUE,
-    }
-
-    return fillTemplate(MEDICAL_NOTE_TEMPLATE, replacements)
-  }, [formData])
-
-  const updateField = (key: keyof FormData, value: string) => {
-    setCopyFeedback('')
-    setFormData((current) => ({ ...current, [key]: value }))
-  }
-
-  const handleReset = (event: FormEvent) => {
-    event.preventDefault()
-    setFormData(INITIAL_FORM)
-    setCopyFeedback('Form reset. No data retained.')
-  }
-
-  const copyNoteToClipboard = async () => {
-    await navigator.clipboard.writeText(noteText)
-  }
-
-  const handleCopy = async (event: FormEvent) => {
-    event.preventDefault()
-
-    try {
-      await copyNoteToClipboard()
-      setCopyFeedback('Note copied to clipboard.')
-    } catch {
-      setCopyFeedback('Unable to copy note. Please copy manually from the preview.')
-    }
-  }
-
-  const handleSmsAndCopy = async (event: FormEvent) => {
-    event.preventDefault()
-
-    try {
-      await copyNoteToClipboard()
-
-      onAddSmsRow({
-        dateEntered: formatDateEntered(),
-        patientName: formData.patientName,
-        clientAccount: formData.account,
-        prescriber: formData.prescriber,
-        status: 'Pending Consultation',
-        priority: formData.priority,
-        phoneNumber: formData.phone,
-        cleanedNumber: getCleanedNumber(formData.phone),
-        secondTextResponse: '',
-      })
-
-      setCopyFeedback('Note copied and SMS TABLE updated.')
-    } catch {
-      setCopyFeedback('Unable to copy note. Please copy manually from the preview.')
-    }
-  }
-
-  return (
-    <main className="app">
-      <div className="app-header">
-        <button type="button" className="secondary" onClick={onBackToTools}>
-          Back to tools
-        </button>
+const createSmsMarkup = () => `
+  <div class="sms-workflow-page">
+    <section class="sms-toolbar">
+      <div>
+        <h2>SMS Workflow Tracking</h2>
+        <p class="sms-subtitle">Track consultation progress and outreach status.</p>
       </div>
-      <h1>Medical Note Template Tool</h1>
-      <p className="privacy">All processing stays in your browser. No data is saved or transmitted.</p>
+      <button type="button" class="sms-add-button" id="sms-add-entry">Add entry</button>
+    </section>
 
-      <div className="layout">
-        <form className="form" onSubmit={(event) => event.preventDefault()}>
-          <label>
-            Patient Name
-            <input value={formData.patientName} onChange={(event) => updateField('patientName', event.target.value)} />
-          </label>
+    <section class="sms-stats" aria-label="Summary stats">
+      <article class="sms-stat-card">
+        <span class="sms-stat-label">Total</span>
+        <strong id="sms-stat-total">0</strong>
+      </article>
+      <article class="sms-stat-card">
+        <span class="sms-stat-label">Pending</span>
+        <strong id="sms-stat-pending">0</strong>
+      </article>
+      <article class="sms-stat-card">
+        <span class="sms-stat-label">Approved</span>
+        <strong id="sms-stat-approved">0</strong>
+      </article>
+      <article class="sms-stat-card">
+        <span class="sms-stat-label">High priority</span>
+        <strong id="sms-stat-high">0</strong>
+      </article>
+    </section>
 
-          <label>
-            Date of Birth
-            <input type="date" value={formData.dob} onChange={(event) => updateField('dob', event.target.value)} />
-          </label>
+    <section class="sms-filters" aria-label="Filters">
+      <label class="sms-filter-field sms-filter-search">
+        <span>Search</span>
+        <input id="sms-filter-search" type="search" placeholder="Search patient or prescriber" />
+      </label>
+      <label class="sms-filter-field">
+        <span>Status</span>
+        <select id="sms-filter-status">
+          <option value="">All statuses</option>
+          <option value="Pending Consultation">Pending Consultation</option>
+          <option value="Under Review">Under Review</option>
+          <option value="Approved">Approved</option>
+          <option value="Denied">Denied</option>
+        </select>
+      </label>
+      <label class="sms-filter-field">
+        <span>Priority</span>
+        <select id="sms-filter-priority">
+          <option value="">All priorities</option>
+          <option value="High">High</option>
+          <option value="Medium">Medium</option>
+          <option value="Low">Low</option>
+        </select>
+      </label>
+    </section>
 
-          <label>
-            Phone Number
-            <input value={formData.phone} onChange={(event) => updateField('phone', event.target.value)} />
-          </label>
-
-          <fieldset>
-            <legend>Gender</legend>
-            <label className="inline">
-              <input
-                type="radio"
-                name="gender"
-                checked={formData.gender === 'Male'}
-                onChange={() => updateField('gender', 'Male')}
-              />
-              Male
-            </label>
-            <label className="inline">
-              <input
-                type="radio"
-                name="gender"
-                checked={formData.gender === 'Female'}
-                onChange={() => updateField('gender', 'Female')}
-              />
-              Female
-            </label>
-          </fieldset>
-
-          <div className="inline-grid">
-            <label>
-              Height (ft)
-              <input
-                type="number"
-                min="0"
-                value={formData.heightFt}
-                onChange={(event) => updateField('heightFt', event.target.value)}
-              />
-            </label>
-            <label>
-              Height (in)
-              <input
-                type="number"
-                min="0"
-                value={formData.heightIn}
-                onChange={(event) => updateField('heightIn', event.target.value)}
-              />
-            </label>
-          </div>
-
-          <label>
-            Weight (lbs)
-            <input type="number" min="0" value={formData.weight} onChange={(event) => updateField('weight', event.target.value)} />
-          </label>
-
-          <label>
-            BMI
-            <input value={formData.bmi} onChange={(event) => updateField('bmi', event.target.value)} />
-          </label>
-
-          <label>
-            Allergies
-            <textarea value={formData.allergies} onChange={(event) => updateField('allergies', event.target.value)} />
-          </label>
-
-          <label>
-            Past Medical History (PMH)
-            <textarea value={formData.pmh} onChange={(event) => updateField('pmh', event.target.value)} />
-          </label>
-
-          <label>
-            Past Surgical History (PSH)
-            <textarea value={formData.psh} onChange={(event) => updateField('psh', event.target.value)} />
-          </label>
-
-          <label>
-            Current Medications
-            <textarea value={formData.medications} onChange={(event) => updateField('medications', event.target.value)} />
-          </label>
-
-          <fieldset>
-            <legend>Previous Weight Loss Programs</legend>
-            <label className="inline">
-              <input
-                type="radio"
-                name="weight-loss"
-                checked={formData.hasWeightLossProgram === 'yes'}
-                onChange={() => updateField('hasWeightLossProgram', 'yes')}
-              />
-              Yes
-            </label>
-            <label className="inline">
-              <input
-                type="radio"
-                name="weight-loss"
-                checked={formData.hasWeightLossProgram === 'no'}
-                onChange={() => updateField('hasWeightLossProgram', 'no')}
-              />
-              No
-            </label>
-          </fieldset>
-
-          <fieldset>
-            <legend>Previous GLP-1 Medication Use</legend>
-            <label className="inline">
-              <input
-                type="radio"
-                name="glp1"
-                checked={formData.hasGlp1 === 'yes'}
-                onChange={() => updateField('hasGlp1', 'yes')}
-              />
-              Yes
-            </label>
-            <label className="inline">
-              <input
-                type="radio"
-                name="glp1"
-                checked={formData.hasGlp1 === 'no'}
-                onChange={() => updateField('hasGlp1', 'no')}
-              />
-              No
-            </label>
-          </fieldset>
-
-          <label>
-            Last Dose of GLP-1 or Weight-Loss Medication
-            <input value={formData.lastDose} onChange={(event) => updateField('lastDose', event.target.value)} />
-          </label>
-
-          <label>
-            Account / Client
-            <select value={formData.account} onChange={(event) => updateField('account', event.target.value)}>
-              <option value="">Select an account</option>
-              {ACCOUNT_OPTIONS.map((option) => (
-                <option key={option} value={option}>
-                  {option}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <label>
-            Prescriber
-            <select value={formData.prescriber} onChange={(event) => updateField('prescriber', event.target.value)}>
-              <option value="">Select a prescriber</option>
-              {PRESCRIBER_OPTIONS.map((option) => (
-                <option key={option} value={option}>
-                  {option}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <label>
-            Medication Being Prescribed
-            <select
-              value={formData.prescribedMedication}
-              onChange={(event) => updateField('prescribedMedication', event.target.value)}
-            >
-              <option value="">Select medication</option>
-              {MEDICATION_OPTIONS.map((option) => (
-                <option key={option} value={option}>
-                  {option}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <label>
-            Priority
-            <select value={formData.priority} onChange={(event) => updateField('priority', event.target.value)}>
-              {PRIORITY_OPTIONS.map((option) => (
-                <option key={option} value={option}>
-                  {option}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <div className="button-row">
-            <button type="button" onClick={handleCopy}>
-              Copy Note
-            </button>
-            <button type="button" onClick={handleSmsAndCopy}>
-              SMS & Copy
-            </button>
-            <button type="button" onClick={handleReset} className="secondary">
-              Reset Form
-            </button>
-          </div>
-          {copyFeedback && <p className="feedback">{copyFeedback}</p>}
-        </form>
-
-        <section className="preview">
-          <h2>Live Preview</h2>
-          <pre>{noteText}</pre>
-        </section>
-      </div>
-    </main>
-  )
-}
-
-type SmsTableToolProps = {
-  onBackToTools: () => void
-  rows: SmsTableRow[]
-  onUpdateRow: (index: number, key: keyof SmsTableRow, value: string) => void
-}
-
-function SmsTableTool({ onBackToTools, rows, onUpdateRow }: SmsTableToolProps) {
-  return (
-    <main className="app sms-app">
-      <div className="app-header">
-        <button type="button" className="secondary" onClick={onBackToTools}>
-          Back to tools
-        </button>
-      </div>
-      <h1>SMS TABLE</h1>
-      <p className="privacy">Use this table to track SMS workflow details.</p>
-
-      <section className="preview sms-table-section">
-        <table className="sms-table">
-          <colgroup>
-            <col style={{ width: '9%' }} />
-            <col style={{ width: '13%' }} />
-            <col style={{ width: '13%' }} />
-            <col style={{ width: '12%' }} />
-            <col style={{ width: '14%' }} />
-            <col style={{ width: '9%' }} />
-            <col style={{ width: '11%' }} />
-            <col style={{ width: '9%' }} />
-            <col style={{ width: '10%' }} />
-          </colgroup>
+    <section class="sms-table-shell">
+      <div class="sms-table-scroll">
+        <table class="sms-table-vanilla" id="sms-table">
           <thead>
             <tr>
-              <th>Date Entered</th>
-              <th>Patient Name</th>
-              <th>Client Account</th>
+              <th>Date entered</th>
+              <th>Patient name</th>
+              <th>Client account</th>
               <th>Prescriber</th>
-              <th>Status (e.g., Pending, Approved)</th>
-              <th>What is the Priority?</th>
-              <th>Phone Number</th>
-              <th>Cleaned Number</th>
-              <th>2nd Text Response</th>
+              <th>Status</th>
+              <th>Priority</th>
+              <th>Phone number</th>
+              <th class="sms-delete-col">Delete row</th>
             </tr>
           </thead>
-          <tbody>
-            {rows.map((row, index) => (
-              <tr key={`${row.patientName}-${index}`}>
-                <td>
-                  <input value={row.dateEntered} onChange={(event) => onUpdateRow(index, 'dateEntered', event.target.value)} />
-                </td>
-                <td>
-                  <input value={row.patientName} onChange={(event) => onUpdateRow(index, 'patientName', event.target.value)} />
-                </td>
-                <td>
-                  <input value={row.clientAccount} onChange={(event) => onUpdateRow(index, 'clientAccount', event.target.value)} />
-                </td>
-                <td>
-                  <input value={row.prescriber} onChange={(event) => onUpdateRow(index, 'prescriber', event.target.value)} />
-                </td>
-                <td>
-                  <select value={row.status} onChange={(event) => onUpdateRow(index, 'status', event.target.value)}>
-                    {SMS_STATUS_OPTIONS.map((option) => (
-                      <option key={option} value={option}>
-                        {option}
-                      </option>
-                    ))}
-                  </select>
-                </td>
-                <td>
-                  <input value={row.priority} onChange={(event) => onUpdateRow(index, 'priority', event.target.value)} />
-                </td>
-                <td>
-                  <input value={row.phoneNumber} onChange={(event) => onUpdateRow(index, 'phoneNumber', event.target.value)} />
-                </td>
-                <td>
-                  <input value={row.cleanedNumber} onChange={(event) => onUpdateRow(index, 'cleanedNumber', event.target.value)} />
-                </td>
-                <td>
-                  <input
-                    value={row.secondTextResponse}
-                    onChange={(event) => onUpdateRow(index, 'secondTextResponse', event.target.value)}
-                  />
-                </td>
-              </tr>
-            ))}
-          </tbody>
+          <tbody id="sms-table-body"></tbody>
         </table>
-      </section>
-    </main>
-  )
+      </div>
+      <div class="sms-empty-state" id="sms-empty-state" hidden>No rows match your filters.</div>
+    </section>
+  </div>
+`
+
+const initializeSmsTable = (container: HTMLElement) => {
+  type SmsStatus = 'Pending Consultation' | 'Under Review' | 'Approved' | 'Denied'
+  type SmsPriority = 'High' | 'Medium' | 'Low'
+  type SmsRow = {
+    id: number
+    dateEntered: string
+    patientName: string
+    clientAccount: string
+    prescriber: string
+    status: SmsStatus
+    priority: SmsPriority
+    phoneNumber: string
+  }
+
+  let nextId = 2
+  let rows: SmsRow[] = [
+    {
+      id: 1,
+      dateEntered: '',
+      patientName: '',
+      clientAccount: '',
+      prescriber: '',
+      status: 'Pending Consultation',
+      priority: 'Medium',
+      phoneNumber: '',
+    },
+  ]
+
+  let pendingFocusId: number | null = null
+
+  const tableBody = container.querySelector<HTMLTableSectionElement>('#sms-table-body')
+  const emptyState = container.querySelector<HTMLElement>('#sms-empty-state')
+  const addButton = container.querySelector<HTMLButtonElement>('#sms-add-entry')
+  const searchInput = container.querySelector<HTMLInputElement>('#sms-filter-search')
+  const statusFilter = container.querySelector<HTMLSelectElement>('#sms-filter-status')
+  const priorityFilter = container.querySelector<HTMLSelectElement>('#sms-filter-priority')
+
+  const statTotal = container.querySelector<HTMLElement>('#sms-stat-total')
+  const statPending = container.querySelector<HTMLElement>('#sms-stat-pending')
+  const statApproved = container.querySelector<HTMLElement>('#sms-stat-approved')
+  const statHigh = container.querySelector<HTMLElement>('#sms-stat-high')
+
+  if (!tableBody || !emptyState || !addButton || !searchInput || !statusFilter || !priorityFilter || !statTotal || !statPending || !statApproved || !statHigh) {
+    return
+  }
+
+  const matchesFilters = (row: SmsRow) => {
+    const search = searchInput.value.trim().toLowerCase()
+    const status = statusFilter.value
+    const priority = priorityFilter.value
+
+    const matchesSearch =
+      !search || row.patientName.toLowerCase().includes(search) || row.prescriber.toLowerCase().includes(search)
+    const matchesStatus = !status || row.status === status
+    const matchesPriority = !priority || row.priority === priority
+
+    return matchesSearch && matchesStatus && matchesPriority
+  }
+
+  const createStatusBadge = (status: SmsStatus) => `<span class="sms-badge sms-badge-${status.toLowerCase().replace(/[^a-z]+/g, '-')}">${status}</span>`
+
+  const createPriorityBadge = (priority: SmsPriority) =>
+    `<span class="sms-priority"><span class="sms-priority-dot sms-priority-${priority.toLowerCase()}"></span>${priority}</span>`
+
+  const updateStats = () => {
+    statTotal.textContent = String(rows.length)
+    statPending.textContent = String(rows.filter((row) => row.status === 'Pending Consultation').length)
+    statApproved.textContent = String(rows.filter((row) => row.status === 'Approved').length)
+    statHigh.textContent = String(rows.filter((row) => row.priority === 'High').length)
+  }
+
+  const render = () => {
+    const filteredRows = rows.filter(matchesFilters)
+
+    tableBody.innerHTML = filteredRows
+      .map(
+        (row) => `
+          <tr data-row-id="${row.id}">
+            <td>
+              <input data-field="dateEntered" type="date" value="${row.dateEntered}" />
+            </td>
+            <td>
+              <input data-field="patientName" data-focus-target="${row.id}" type="text" value="${row.patientName.replace(/"/g, '&quot;')}" />
+            </td>
+            <td>
+              <input data-field="clientAccount" type="text" inputmode="numeric" placeholder="ACC-1234" value="${row.clientAccount.replace(/"/g, '&quot;')}" />
+            </td>
+            <td>
+              <input data-field="prescriber" type="text" value="${row.prescriber.replace(/"/g, '&quot;')}" />
+            </td>
+            <td>
+              <label class="sms-select-wrap">
+                ${createStatusBadge(row.status)}
+                <select data-field="status" aria-label="Status">
+                  <option value="Pending Consultation" ${row.status === 'Pending Consultation' ? 'selected' : ''}>Pending Consultation</option>
+                  <option value="Under Review" ${row.status === 'Under Review' ? 'selected' : ''}>Under Review</option>
+                  <option value="Approved" ${row.status === 'Approved' ? 'selected' : ''}>Approved</option>
+                  <option value="Denied" ${row.status === 'Denied' ? 'selected' : ''}>Denied</option>
+                </select>
+              </label>
+            </td>
+            <td>
+              <label class="sms-select-wrap">
+                ${createPriorityBadge(row.priority)}
+                <select data-field="priority" aria-label="Priority">
+                  <option value="High" ${row.priority === 'High' ? 'selected' : ''}>High</option>
+                  <option value="Medium" ${row.priority === 'Medium' ? 'selected' : ''}>Medium</option>
+                  <option value="Low" ${row.priority === 'Low' ? 'selected' : ''}>Low</option>
+                </select>
+              </label>
+            </td>
+            <td>
+              <input data-field="phoneNumber" type="tel" value="${row.phoneNumber.replace(/"/g, '&quot;')}" />
+            </td>
+            <td class="sms-delete-cell">
+              <button type="button" class="sms-delete-button" data-action="delete" aria-label="Delete row">✕</button>
+            </td>
+          </tr>
+        `,
+      )
+      .join('')
+
+    emptyState.hidden = filteredRows.length > 0
+    updateStats()
+
+    if (pendingFocusId !== null) {
+      const focusTarget = tableBody.querySelector<HTMLInputElement>(`input[data-focus-target="${pendingFocusId}"]`)
+      focusTarget?.focus()
+      pendingFocusId = null
+    }
+  }
+
+  const updateRow = (rowId: number, field: keyof Omit<SmsRow, 'id'>, value: string) => {
+    rows = rows.map((row) => {
+      if (row.id !== rowId) return row
+      if (field === 'clientAccount') {
+        const digits = value.replace(/\D/g, '').slice(0, 4)
+        return { ...row, clientAccount: digits ? `ACC-${digits}` : '' }
+      }
+      return { ...row, [field]: value } as SmsRow
+    })
+    render()
+  }
+
+  addButton.addEventListener('click', () => {
+    const newRow: SmsRow = {
+      id: nextId++,
+      dateEntered: '',
+      patientName: '',
+      clientAccount: '',
+      prescriber: '',
+      status: 'Pending Consultation',
+      priority: 'Medium',
+      phoneNumber: '',
+    }
+    rows = [...rows, newRow]
+    pendingFocusId = newRow.id
+    render()
+  })
+
+  ;[searchInput, statusFilter, priorityFilter].forEach((element) => {
+    element.addEventListener('input', render)
+    element.addEventListener('change', render)
+  })
+
+  tableBody.addEventListener('change', (event) => {
+    const target = event.target as HTMLInputElement | HTMLSelectElement
+    const rowElement = target.closest<HTMLTableRowElement>('tr[data-row-id]')
+    if (!rowElement) return
+    const rowId = Number(rowElement.dataset.rowId)
+    const field = target.dataset.field as keyof Omit<SmsRow, 'id'> | undefined
+    if (!field) return
+    updateRow(rowId, field, target.value)
+  })
+
+  tableBody.addEventListener('blur', (event) => {
+    const target = event.target as HTMLInputElement | HTMLSelectElement
+    const rowElement = target.closest<HTMLTableRowElement>('tr[data-row-id]')
+    if (!rowElement) return
+    const rowId = Number(rowElement.dataset.rowId)
+    const field = target.dataset.field as keyof Omit<SmsRow, 'id'> | undefined
+    if (!field) return
+    updateRow(rowId, field, target.value)
+  }, true)
+
+  tableBody.addEventListener('click', (event) => {
+    const target = event.target as HTMLElement
+    const deleteButton = target.closest<HTMLButtonElement>('button[data-action="delete"]')
+    if (!deleteButton) return
+    const rowElement = deleteButton.closest<HTMLTableRowElement>('tr[data-row-id]')
+    if (!rowElement) return
+    const rowId = Number(rowElement.dataset.rowId)
+    rows = rows.filter((row) => row.id !== rowId)
+    render()
+  })
+
+  render()
 }
 
 function App() {
-  const [accessCode, setAccessCode] = useState('')
-  const [accessError, setAccessError] = useState('')
-  const [isAccessGranted, setIsAccessGranted] = useState(false)
-  const [selectedTool, setSelectedTool] = useState<ToolSelection>(null)
-  const [smsRows, setSmsRows] = useState<SmsTableRow[]>(INITIAL_SMS_ROWS)
+  const root = document.querySelector('#root')
+  if (!root) return null
 
-  const handleAccessSubmit = (event: FormEvent) => {
-    event.preventDefault()
+  const noteText = fillTemplate(MEDICAL_NOTE_TEMPLATE, {
+    'PATIENT NAME': INITIAL_FORM.patientName || MISSING_VALUE,
+    AGE: getAge(INITIAL_FORM.dob),
+    GENDER: INITIAL_FORM.gender || MISSING_VALUE,
+    PMH: INITIAL_FORM.pmh || MISSING_VALUE,
+    BMI: INITIAL_FORM.bmi || MISSING_VALUE,
+    HAS_WEIGHT_LOSS_PROGRAM: getYesNoPhrase(INITIAL_FORM.hasWeightLossProgram),
+    HAS_GLP1: getYesNoPhrase(INITIAL_FORM.hasGlp1),
+    'LAST DOSE': INITIAL_FORM.lastDose || MISSING_VALUE,
+    PSH: INITIAL_FORM.psh || MISSING_VALUE,
+    Allergy: INITIAL_FORM.allergies || MISSING_VALUE,
+    MEDICATION: INITIAL_FORM.medications || MISSING_VALUE,
+    HEIGHT: getHeightInches(INITIAL_FORM.heightFt, INITIAL_FORM.heightIn),
+    WEIGHT: INITIAL_FORM.weight || MISSING_VALUE,
+    'ZEPBOUND/MONJAURO or OZEMPIC/WAGOVY': INITIAL_FORM.prescribedMedication || MISSING_VALUE,
+  })
 
-    if (accessCode.trim().toUpperCase() === TEMPORARY_ACCESS_CODE) {
-      setAccessError('')
-      setIsAccessGranted(true)
-      return
-    }
+  root.innerHTML = `
+    <main class="app sms-fullwidth-app">
+      <div class="app-header">
+        <div class="tool-tabs" role="tablist" aria-label="Tools">
+          <button type="button" class="tool-tab" data-tool="medical-note">Medical Note</button>
+          <button type="button" class="tool-tab active" data-tool="sms-table">SMS TABLE</button>
+        </div>
+      </div>
 
-    setAccessError('Invalid access code. Please try again.')
-  }
-
-  const handleAddSmsRow = (row: SmsTableRow) => {
-    setSmsRows((current) => [...current, row])
-    setSelectedTool('sms-table')
-  }
-
-  const handleUpdateSmsRow = (index: number, key: keyof SmsTableRow, value: string) => {
-    setSmsRows((current) =>
-      current.map((row, rowIndex) => {
-        if (rowIndex !== index) return row
-
-        const updatedRow = { ...row, [key]: value }
-
-        if (key === 'phoneNumber') {
-          updatedRow.cleanedNumber = getCleanedNumber(value)
-        }
-
-        return updatedRow
-      }),
-    )
-  }
-
-  if (!isAccessGranted) {
-    return (
-      <main className="app gate-page">
-        <section className="gate-card">
-          <h1>BirkeHealth Tools</h1>
-          <p className="privacy">
-            Enter the access code to continue. This gate is client-side only and should not be treated as secure authentication.
-          </p>
-          <form onSubmit={handleAccessSubmit} className="gate-form">
-            <label>
-              Access Code
-              <input
-                value={accessCode}
-                onChange={(event) => {
-                  setAccessError('')
-                  setAccessCode(event.target.value)
-                }}
-              />
-            </label>
-            <button type="submit">Continue</button>
-          </form>
-          {accessError && <p className="feedback">{accessError}</p>}
+      <section id="medical-note-view" hidden>
+        <h1>Medical Note Template Tool</h1>
+        <p class="privacy">All processing stays in your browser. No data is saved or transmitted.</p>
+        <section class="preview">
+          <h2>Live Preview</h2>
+          <pre>${noteText}</pre>
         </section>
-      </main>
-    )
-  }
+      </section>
 
-  if (selectedTool === null) {
-    return (
-      <main className="app gate-page">
-        <section className="gate-card">
-          <h1>Select a Tool</h1>
-          <p className="privacy">Choose a tool to open.</p>
-          <div className="tool-list">
-            <button type="button" onClick={() => setSelectedTool('medical-note')}>
-              Medical Note
-            </button>
-            <button type="button" onClick={() => setSelectedTool('sms-table')}>
-              SMS TABLE
-            </button>
-          </div>
-        </section>
-      </main>
-    )
-  }
+      <section id="sms-table-view">
+        ${createSmsMarkup()}
+      </section>
+    </main>
+  `
 
-  if (selectedTool === 'sms-table') {
-    return <SmsTableTool onBackToTools={() => setSelectedTool(null)} rows={smsRows} onUpdateRow={handleUpdateSmsRow} />
-  }
+  const medicalNoteView = root.querySelector<HTMLElement>('#medical-note-view')
+  const smsTableView = root.querySelector<HTMLElement>('#sms-table-view')
+  const tabs = Array.from(root.querySelectorAll<HTMLButtonElement>('.tool-tab'))
 
-  return <MedicalNoteTool onBackToTools={() => setSelectedTool(null)} onAddSmsRow={handleAddSmsRow} />
+  tabs.forEach((tab) => {
+    tab.addEventListener('click', () => {
+      const tool = tab.dataset.tool
+      tabs.forEach((button) => button.classList.toggle('active', button === tab))
+      if (tool === 'medical-note') {
+        medicalNoteView?.removeAttribute('hidden')
+        smsTableView?.setAttribute('hidden', 'true')
+      } else {
+        smsTableView?.removeAttribute('hidden')
+        medicalNoteView?.setAttribute('hidden', 'true')
+      }
+    })
+  })
+
+  const smsContainer = root.querySelector<HTMLElement>('.sms-workflow-page')
+  if (smsContainer) initializeSmsTable(smsContainer)
+
+  return null
 }
 
 export default App
