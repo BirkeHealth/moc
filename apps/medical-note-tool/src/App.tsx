@@ -242,12 +242,7 @@ function SmsTableTool({ onBackToTools, rows, setRows }: { onBackToTools: () => v
   const showingFrom = totalRows === 0 ? 0 : (safePage - 1) * entriesPerPage + 1
   const showingTo = Math.min(safePage * entriesPerPage, totalRows)
 
-  const stats = useMemo(() => ({
-    total: rows.length,
-    pending: rows.filter((row) => row.status === 'Pending Consultation').length,
-    approved: rows.filter((row) => row.status === 'Approved').length,
-    highPriority: rows.filter((row) => row.priority === 'High').length,
-  }), [rows])
+  const stats = useMemo(() => ({ total: rows.length, pending: rows.filter((row) => row.status === 'Pending Consultation').length, approved: rows.filter((row) => row.status === 'Approved').length, highPriority: rows.filter((row) => row.priority === 'High').length }), [rows])
 
   const updateRow = <K extends keyof Omit<SmsRow, 'id'>>(rowId: number, field: K, value: SmsRow[K]) => {
     setRows((current) => current.map((row) => (row.id === rowId ? { ...row, [field]: value } : row)))
@@ -285,110 +280,96 @@ function SmsTableTool({ onBackToTools, rows, setRows }: { onBackToTools: () => v
   }, [safePage, totalPages])
 
   return (
-    <main className="app sms-compact-page sms-frame-reference">
-      <div className="sms-topnav-spacer" />
-      <div className="sms-main-shell">
-        <aside className="sms-left-rail" aria-hidden="true" />
-        <section className="sms-content-region datatable-page">
-          <div className="app-header sms-compact-header tight">
-            <div>
-              <h1>SMS Workflow Table</h1>
-              <p className="privacy">Compact spreadsheet view for fast editing.</p>
+    <main className="app sms-compact-page">
+      <section className="sms-content-region datatable-page datatable-page-fullwidth">
+        <div className="app-header sms-compact-header tight">
+          <div>
+            <h1>SMS Workflow Table</h1>
+            <p className="privacy">Compact spreadsheet view for fast editing.</p>
+          </div>
+          <div className="sms-header-actions">
+            <button type="button" className="secondary" onClick={onBackToTools}>Back to tools</button>
+            <button type="button" onClick={handleAddEntry}>Add row</button>
+          </div>
+        </div>
+
+        <div className="sms-stat-strip"><span>Total <strong>{stats.total}</strong></span><span>Pending <strong>{stats.pending}</strong></span><span>Approved <strong>{stats.approved}</strong></span><span>High <strong>{stats.highPriority}</strong></span></div>
+
+        <div className="datatable-wrapper no-footer sortable searchable fixed-columns">
+          <div className="datatable-top">
+            <div className="datatable-dropdown">
+              <label>
+                <select className="datatable-selector" name="per-page" value={entriesPerPage} onChange={(event) => { setEntriesPerPage(Number(event.target.value)); setPage(1) }}>
+                  {ENTRIES_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}
+                </select>
+                {' '}entries per page
+              </label>
             </div>
-            <div className="sms-header-actions">
-              <button type="button" className="secondary" onClick={onBackToTools}>Back to tools</button>
-              <button type="button" onClick={handleAddEntry}>Add row</button>
+            <div className="datatable-filters-inline">
+              <select value={filters.status} onChange={(event) => { setFilters((current) => ({ ...current, status: event.target.value as FilterState['status'] })); setPage(1) }}>
+                <option value="">All statuses</option>
+                {SMS_STATUS_OPTIONS.map((status) => <option key={status} value={status}>{status}</option>)}
+              </select>
+              <select value={filters.priority} onChange={(event) => { setFilters((current) => ({ ...current, priority: event.target.value as FilterState['priority'] })); setPage(1) }}>
+                <option value="">All priorities</option>
+                {SMS_PRIORITY_OPTIONS.map((priority) => <option key={priority} value={priority}>{priority}</option>)}
+              </select>
+            </div>
+            <div className="datatable-search">
+              <input className="datatable-input" placeholder="Search..." type="search" name="search" value={filters.search} onChange={(event) => { setFilters((current) => ({ ...current, search: event.target.value })); setPage(1) }} />
             </div>
           </div>
 
-          <div className="sms-stat-strip"><span>Total <strong>{stats.total}</strong></span><span>Pending <strong>{stats.pending}</strong></span><span>Approved <strong>{stats.approved}</strong></span><span>High <strong>{stats.highPriority}</strong></span></div>
-
-          <div className="datatable-wrapper no-footer sortable searchable fixed-columns">
-            <div className="datatable-top">
-              <div className="datatable-dropdown">
-                <label>
-                  <select className="datatable-selector" name="per-page" value={entriesPerPage} onChange={(event) => { setEntriesPerPage(Number(event.target.value)); setPage(1) }}>
-                    {ENTRIES_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}
-                  </select>
-                  {' '}entries per page
-                </label>
-              </div>
-              <div className="datatable-filters-inline">
-                <select value={filters.status} onChange={(event) => { setFilters((current) => ({ ...current, status: event.target.value as FilterState['status'] })); setPage(1) }}>
-                  <option value="">All statuses</option>
-                  {SMS_STATUS_OPTIONS.map((status) => <option key={status} value={status}>{status}</option>)}
-                </select>
-                <select value={filters.priority} onChange={(event) => { setFilters((current) => ({ ...current, priority: event.target.value as FilterState['priority'] })); setPage(1) }}>
-                  <option value="">All priorities</option>
-                  {SMS_PRIORITY_OPTIONS.map((priority) => <option key={priority} value={priority}>{priority}</option>)}
-                </select>
-              </div>
-              <div className="datatable-search">
-                <input className="datatable-input" placeholder="Search..." type="search" name="search" value={filters.search} onChange={(event) => { setFilters((current) => ({ ...current, search: event.target.value })); setPage(1) }} />
-              </div>
-            </div>
-
-            <div className="datatable-container">
-              <table className="datatable-table sms-datatable-table">
-                <thead>
-                  <tr>
-                    <th style={{ width: '11%' }}><button className="datatable-sorter">Date</button></th>
-                    <th style={{ width: '16%' }}><button className="datatable-sorter">Patient</button></th>
-                    <th style={{ width: '13%' }}><button className="datatable-sorter">Account</button></th>
-                    <th style={{ width: '16%' }}><button className="datatable-sorter">Prescriber</button></th>
-                    <th style={{ width: '14%' }}><button className="datatable-sorter">Status</button></th>
-                    <th style={{ width: '8%' }}><button className="datatable-sorter">Priority</button></th>
-                    <th style={{ width: '12%' }}><button className="datatable-sorter">Phone</button></th>
-                    <th style={{ width: '10%' }}><button className="datatable-sorter">Note</button></th>
-                    <th style={{ width: '40px' }}></th>
+          <div className="datatable-container">
+            <table className="datatable-table sms-datatable-table">
+              <thead>
+                <tr>
+                  <th style={{ width: '11%' }}><button className="datatable-sorter">Date</button></th>
+                  <th style={{ width: '16%' }}><button className="datatable-sorter">Patient</button></th>
+                  <th style={{ width: '13%' }}><button className="datatable-sorter">Account</button></th>
+                  <th style={{ width: '16%' }}><button className="datatable-sorter">Prescriber</button></th>
+                  <th style={{ width: '14%' }}><button className="datatable-sorter">Status</button></th>
+                  <th style={{ width: '8%' }}><button className="datatable-sorter">Priority</button></th>
+                  <th style={{ width: '12%' }}><button className="datatable-sorter">Phone</button></th>
+                  <th style={{ width: '10%' }}><button className="datatable-sorter">Note</button></th>
+                  <th style={{ width: '40px' }}></th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td></td>
+                  <td><button type="button" className="sms-add-inline-row" onClick={handleAddEntry}>Add +</button></td>
+                  <td></td><td></td><td></td><td></td><td></td><td></td><td></td>
+                </tr>
+                {pagedRows.map((row) => (
+                  <tr key={row.id}>
+                    <td><input type="date" value={row.dateEntered} onChange={handleInputChange(row.id, 'dateEntered')} /></td>
+                    <td><input ref={(node) => { patientInputRefs.current[row.id] = node }} value={row.patient} onChange={handleInputChange(row.id, 'patient')} /></td>
+                    <td><select value={row.account} onChange={handleInputChange(row.id, 'account')}><option value="">Select</option>{ACCOUNT_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}</select></td>
+                    <td><select value={row.prescriber} onChange={handleInputChange(row.id, 'prescriber')}><option value="">Select</option>{PRESCRIBER_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}</select></td>
+                    <td><select value={row.status} onChange={handleInputChange(row.id, 'status')}>{SMS_STATUS_OPTIONS.map((status) => <option key={status} value={status}>{status}</option>)}</select></td>
+                    <td><select value={row.priority} onChange={handleInputChange(row.id, 'priority')}>{SMS_PRIORITY_OPTIONS.map((priority) => <option key={priority} value={priority}>{priority}</option>)}</select></td>
+                    <td><input value={row.phone} onChange={handleInputChange(row.id, 'phone')} /></td>
+                    <td><input value={row.note} onChange={handleInputChange(row.id, 'note')} /></td>
+                    <td className="sms-delete-cell"><button type="button" className="sms-delete-button compact" onClick={() => handleDeleteRow(row.id)}>✕</button></td>
                   </tr>
-                </thead>
-                <tbody>
-                  <tr>
-                    <td></td>
-                    <td><button type="button" className="sms-add-inline-row" onClick={handleAddEntry}>Add +</button></td>
-                    <td></td><td></td><td></td><td></td><td></td><td></td><td></td>
-                  </tr>
-                  {pagedRows.map((row) => (
-                    <tr key={row.id}>
-                      <td><input type="date" value={row.dateEntered} onChange={handleInputChange(row.id, 'dateEntered')} /></td>
-                      <td><input ref={(node) => { patientInputRefs.current[row.id] = node }} value={row.patient} onChange={handleInputChange(row.id, 'patient')} /></td>
-                      <td><select value={row.account} onChange={handleInputChange(row.id, 'account')}><option value="">Select</option>{ACCOUNT_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}</select></td>
-                      <td><select value={row.prescriber} onChange={handleInputChange(row.id, 'prescriber')}><option value="">Select</option>{PRESCRIBER_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}</select></td>
-                      <td><select value={row.status} onChange={handleInputChange(row.id, 'status')}>{SMS_STATUS_OPTIONS.map((status) => <option key={status} value={status}>{status}</option>)}</select></td>
-                      <td><select value={row.priority} onChange={handleInputChange(row.id, 'priority')}>{SMS_PRIORITY_OPTIONS.map((priority) => <option key={priority} value={priority}>{priority}</option>)}</select></td>
-                      <td><input value={row.phone} onChange={handleInputChange(row.id, 'phone')} /></td>
-                      <td><input value={row.note} onChange={handleInputChange(row.id, 'note')} /></td>
-                      <td className="sms-delete-cell"><button type="button" className="sms-delete-button compact" onClick={() => handleDeleteRow(row.id)}>✕</button></td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            <div className="datatable-bottom">
-              <div className="datatable-info">Showing {showingFrom} to {showingTo} of {totalRows} entries</div>
-              <nav className="datatable-pagination">
-                <ul className="datatable-pagination-list">
-                  <li className={`datatable-pagination-list-item ${safePage === 1 ? 'datatable-disabled' : ''}`}>
-                    <button className="datatable-pagination-list-item-link" onClick={() => setPage((current) => Math.max(1, current - 1))}>‹</button>
-                  </li>
-                  {visiblePages.map((item, index) => item === 'ellipsis' ? (
-                    <li key={`ellipsis-${index}`} className="datatable-pagination-list-item datatable-ellipsis datatable-disabled"><button className="datatable-pagination-list-item-link">…</button></li>
-                  ) : (
-                    <li key={item} className={`datatable-pagination-list-item ${safePage === item ? 'datatable-active' : ''}`}>
-                      <button className="datatable-pagination-list-item-link" onClick={() => setPage(item)}>{item}</button>
-                    </li>
-                  ))}
-                  <li className={`datatable-pagination-list-item ${safePage === totalPages ? 'datatable-disabled' : ''}`}>
-                    <button className="datatable-pagination-list-item-link" onClick={() => setPage((current) => Math.min(totalPages, current + 1))}>›</button>
-                  </li>
-                </ul>
-              </nav>
-            </div>
+                ))}
+              </tbody>
+            </table>
           </div>
-        </section>
-      </div>
+
+          <div className="datatable-bottom">
+            <div className="datatable-info">Showing {showingFrom} to {showingTo} of {totalRows} entries</div>
+            <nav className="datatable-pagination">
+              <ul className="datatable-pagination-list">
+                <li className={`datatable-pagination-list-item ${safePage === 1 ? 'datatable-disabled' : ''}`}><button className="datatable-pagination-list-item-link" onClick={() => setPage((current) => Math.max(1, current - 1))}>‹</button></li>
+                {visiblePages.map((item, index) => item === 'ellipsis' ? <li key={`ellipsis-${index}`} className="datatable-pagination-list-item datatable-ellipsis datatable-disabled"><button className="datatable-pagination-list-item-link">…</button></li> : <li key={item} className={`datatable-pagination-list-item ${safePage === item ? 'datatable-active' : ''}`}><button className="datatable-pagination-list-item-link" onClick={() => setPage(item)}>{item}</button></li>)}
+                <li className={`datatable-pagination-list-item ${safePage === totalPages ? 'datatable-disabled' : ''}`}><button className="datatable-pagination-list-item-link" onClick={() => setPage((current) => Math.min(totalPages, current + 1))}>›</button></li>
+              </ul>
+            </nav>
+          </div>
+        </div>
+      </section>
     </main>
   )
 }
