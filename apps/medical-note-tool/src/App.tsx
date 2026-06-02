@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 
 type YesNo = '' | 'yes' | 'no'
@@ -122,6 +122,8 @@ const PRIORITY_STYLES: Record<SmsPriority, string> = {
 const MISSING_VALUE = '—'
 const TEMPORARY_ACCESS_CODE = 'MOC0813'
 const RINGCENTRAL_API_URL = 'https://platform.ringcentral.com'
+const SMS_TOKEN_STORAGE_KEY = 'medical-note-tool:smsToken'
+const SMS_FROM_NUMBER_STORAGE_KEY = 'medical-note-tool:fromNumber'
 const fieldClassName = 'w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm outline-none transition focus:border-sky-400 focus:ring-2 focus:ring-sky-100'
 const buttonPrimaryClassName = 'inline-flex items-center justify-center rounded-md border border-sky-700 bg-sky-700 px-3 py-2 text-sm font-medium text-white transition hover:bg-sky-800'
 const buttonSecondaryClassName = 'inline-flex items-center justify-center rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50'
@@ -137,6 +139,14 @@ const formatAccountCode = (value: string) => {
   return digits ? `ACC-${digits}` : ''
 }
 const mapNotePriorityToSmsPriority = (value: string): SmsPriority => (value === 'Rush' ? 'High' : 'Medium')
+const getStoredValue = (key: string) => {
+  if (typeof window === 'undefined') return ''
+  try {
+    return window.localStorage.getItem(key) ?? ''
+  } catch {
+    return ''
+  }
+}
 const normalizePhoneNumber = (raw: string) => {
   if (!raw.trim()) return ''
   const normalized = raw.trim().replace(/[^\d+]/g, '')
@@ -362,13 +372,39 @@ function SmsTableTool({ onBackToTools, rows, setRows }: { onBackToTools: () => v
   const [search, setSearch] = useState('')
   const [filterStatus, setFilterStatus] = useState<SmsStatus | ''>('')
   const [filterPriority, setFilterPriority] = useState<SmsPriority | ''>('')
-  const [smsToken, setSmsToken] = useState('')
+  const [smsToken, setSmsToken] = useState(() => getStoredValue(SMS_TOKEN_STORAGE_KEY))
   const [showSmsToken, setShowSmsToken] = useState(false)
-  const [fromNumber, setFromNumber] = useState('')
+  const [fromNumber, setFromNumber] = useState(() => getStoredValue(SMS_FROM_NUMBER_STORAGE_KEY))
   const [smsFeedback, setSmsFeedback] = useState('')
   const [isSending, setIsSending] = useState(false)
   const [selectedSendAction, setSelectedSendAction] = useState('')
   const nextIdRef = useRef(Math.max(0, ...rows.map((row) => row.id)) + 1)
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    try {
+      if (smsToken) {
+        window.localStorage.setItem(SMS_TOKEN_STORAGE_KEY, smsToken)
+      } else {
+        window.localStorage.removeItem(SMS_TOKEN_STORAGE_KEY)
+      }
+    } catch {
+      // Ignore localStorage errors
+    }
+  }, [smsToken])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    try {
+      if (fromNumber) {
+        window.localStorage.setItem(SMS_FROM_NUMBER_STORAGE_KEY, fromNumber)
+      } else {
+        window.localStorage.removeItem(SMS_FROM_NUMBER_STORAGE_KEY)
+      }
+    } catch {
+      // Ignore localStorage errors
+    }
+  }, [fromNumber])
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase()
@@ -614,7 +650,7 @@ function SmsTableTool({ onBackToTools, rows, setRows }: { onBackToTools: () => v
             <option value="follow-up">2nd Text Follow-up</option>
           </select>
         </div>
-        <p className="mt-2 text-xs text-slate-500">Token and from number are kept in memory for this page load only.</p>
+        <p className="mt-2 text-xs text-slate-500">Token and from number are saved locally in this browser and auto-filled on reload.</p>
         {smsFeedback && <p className="mt-2 text-sm text-slate-600" role="status" aria-live="polite">{smsFeedback}</p>}
 
         <div className="mt-4 overflow-x-auto overflow-y-hidden rounded-lg border border-slate-200">
