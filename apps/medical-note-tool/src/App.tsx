@@ -154,8 +154,6 @@ Recommend drinking sufficient water and working on adhering to a balanced diet w
 Will follow up with patient in 3-4 weeks to assess response and side effects.`
 
 const MISSING_VALUE = '—'
-// Frontend-only temporary gate for static hosting. This is not secure authentication
-// and should be replaced by server-side auth before any sensitive use.
 const TEMPORARY_ACCESS_CODE = 'MOC0813'
 
 const formatDateEntered = (): string => {
@@ -526,41 +524,74 @@ function SmsTableTool({ onBackToTools, rows, onUpdateRow }: SmsTableToolProps) {
       <p className="privacy">Use this table to track SMS workflow details.</p>
 
       <section className="preview sms-table-section">
-        <div className="sms-grid-header">
-          <div>Date Entered</div>
-          <div>Patient Name</div>
-          <div>Client Account</div>
-          <div>Prescriber</div>
-          <div>Status</div>
-          <div>Priority</div>
-          <div>Phone Number</div>
-          <div>Cleaned Number</div>
-          <div>2nd Text Response</div>
-        </div>
-        <div className="sms-grid-body">
-          {rows.map((row, index) => (
-            <div className="sms-grid-row" key={`${row.patientName}-${index}`}>
-              <input value={row.dateEntered} onChange={(event) => onUpdateRow(index, 'dateEntered', event.target.value)} />
-              <input value={row.patientName} onChange={(event) => onUpdateRow(index, 'patientName', event.target.value)} />
-              <input value={row.clientAccount} onChange={(event) => onUpdateRow(index, 'clientAccount', event.target.value)} />
-              <input value={row.prescriber} onChange={(event) => onUpdateRow(index, 'prescriber', event.target.value)} />
-              <select value={row.status} onChange={(event) => onUpdateRow(index, 'status', event.target.value)}>
-                {SMS_STATUS_OPTIONS.map((option) => (
-                  <option key={option} value={option}>
-                    {option}
-                  </option>
-                ))}
-              </select>
-              <input value={row.priority} onChange={(event) => onUpdateRow(index, 'priority', event.target.value)} />
-              <input value={row.phoneNumber} onChange={(event) => onUpdateRow(index, 'phoneNumber', event.target.value)} />
-              <input value={row.cleanedNumber} onChange={(event) => onUpdateRow(index, 'cleanedNumber', event.target.value)} />
-              <input
-                value={row.secondTextResponse}
-                onChange={(event) => onUpdateRow(index, 'secondTextResponse', event.target.value)}
-              />
-            </div>
-          ))}
-        </div>
+        <table className="sms-table">
+          <colgroup>
+            <col style={{ width: '9%' }} />
+            <col style={{ width: '13%' }} />
+            <col style={{ width: '13%' }} />
+            <col style={{ width: '12%' }} />
+            <col style={{ width: '14%' }} />
+            <col style={{ width: '9%' }} />
+            <col style={{ width: '11%' }} />
+            <col style={{ width: '9%' }} />
+            <col style={{ width: '10%' }} />
+          </colgroup>
+          <thead>
+            <tr>
+              <th>Date Entered</th>
+              <th>Patient Name</th>
+              <th>Client Account</th>
+              <th>Prescriber</th>
+              <th>Status (e.g., Pending, Approved)</th>
+              <th>What is the Priority?</th>
+              <th>Phone Number</th>
+              <th>Cleaned Number</th>
+              <th>2nd Text Response</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row, index) => (
+              <tr key={`${row.patientName}-${index}`}>
+                <td>
+                  <input value={row.dateEntered} onChange={(event) => onUpdateRow(index, 'dateEntered', event.target.value)} />
+                </td>
+                <td>
+                  <input value={row.patientName} onChange={(event) => onUpdateRow(index, 'patientName', event.target.value)} />
+                </td>
+                <td>
+                  <input value={row.clientAccount} onChange={(event) => onUpdateRow(index, 'clientAccount', event.target.value)} />
+                </td>
+                <td>
+                  <input value={row.prescriber} onChange={(event) => onUpdateRow(index, 'prescriber', event.target.value)} />
+                </td>
+                <td>
+                  <select value={row.status} onChange={(event) => onUpdateRow(index, 'status', event.target.value)}>
+                    {SMS_STATUS_OPTIONS.map((option) => (
+                      <option key={option} value={option}>
+                        {option}
+                      </option>
+                    ))}
+                  </select>
+                </td>
+                <td>
+                  <input value={row.priority} onChange={(event) => onUpdateRow(index, 'priority', event.target.value)} />
+                </td>
+                <td>
+                  <input value={row.phoneNumber} onChange={(event) => onUpdateRow(index, 'phoneNumber', event.target.value)} />
+                </td>
+                <td>
+                  <input value={row.cleanedNumber} onChange={(event) => onUpdateRow(index, 'cleanedNumber', event.target.value)} />
+                </td>
+                <td>
+                  <input
+                    value={row.secondTextResponse}
+                    onChange={(event) => onUpdateRow(index, 'secondTextResponse', event.target.value)}
+                  />
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </section>
     </main>
   )
