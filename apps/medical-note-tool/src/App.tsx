@@ -310,6 +310,7 @@ function SmsTableTool({ onBackToTools, rows, setRows }: { onBackToTools: () => v
   const [fromNumber, setFromNumber] = useState('')
   const [smsFeedback, setSmsFeedback] = useState('')
   const [isSending, setIsSending] = useState(false)
+  const [selectedSendAction, setSelectedSendAction] = useState('')
   const nextIdRef = useRef(Math.max(0, ...rows.map((row) => row.id)) + 1)
 
   const filtered = useMemo(() => {
@@ -475,7 +476,7 @@ function SmsTableTool({ onBackToTools, rows, setRows }: { onBackToTools: () => v
           <input type="text" placeholder="Search patient or prescriber…" value={search} onChange={(event) => setSearch(event.target.value)} className={`${fieldClassName} w-full sm:ml-auto sm:max-w-xs`} />
         </div>
 
-        <div className="mt-3 grid gap-2 lg:grid-cols-[minmax(220px,1fr)_minmax(200px,220px)_auto_auto]">
+        <div className="mt-3 grid gap-2 lg:grid-cols-[minmax(220px,1fr)_minmax(200px,220px)_minmax(220px,240px)]">
           <div className="flex gap-2">
             <input
               type={showSmsToken ? 'text' : 'password'}
@@ -498,12 +499,30 @@ function SmsTableTool({ onBackToTools, rows, setRows }: { onBackToTools: () => v
             onChange={(event) => setFromNumber(event.target.value)}
             className={fieldClassName}
           />
-          <button type="button" className={buttonPrimaryClassName} onClick={sendConsultationRequired} disabled={isSending}>
-            Send Consultation Required
-          </button>
-          <button type="button" className={buttonSecondaryClassName} onClick={sendFollowUpTexts} disabled={isSending}>
-            Send 2nd Text Follow-up
-          </button>
+          <select
+            value={selectedSendAction}
+            onChange={async (event) => {
+              const action = event.target.value
+              if (!action) return
+              setSelectedSendAction(action)
+
+              try {
+                if (action === 'consultation-required') {
+                  await sendConsultationRequired()
+                } else if (action === 'follow-up') {
+                  await sendFollowUpTexts()
+                }
+              } finally {
+                setSelectedSendAction('')
+              }
+            }}
+            className={fieldClassName}
+            disabled={isSending}
+          >
+            <option value="">Send Action</option>
+            <option value="consultation-required">Process Consultation Required</option>
+            <option value="follow-up">2nd Text Follow-up</option>
+          </select>
         </div>
         <p className="mt-2 text-xs text-slate-500">Token and from number are kept in memory for this page load only.</p>
         {smsFeedback && <p className="mt-2 text-sm text-slate-600" role="status" aria-live="polite">{smsFeedback}</p>}
