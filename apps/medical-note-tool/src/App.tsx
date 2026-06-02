@@ -317,7 +317,7 @@ function SmsTableTool({ onBackToTools, rows, setRows }: { onBackToTools: () => v
   }
 
   return (
-    <main className="mx-auto min-h-screen w-full max-w-[1200px] px-3 py-4 sm:px-4">
+    <main className="min-h-screen w-full px-3 py-4 sm:px-4">
       <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
@@ -351,8 +351,18 @@ function SmsTableTool({ onBackToTools, rows, setRows }: { onBackToTools: () => v
           <input type="text" placeholder="Search patient or prescriber…" value={search} onChange={(event) => setSearch(event.target.value)} className={`${fieldClassName} w-full sm:ml-auto sm:max-w-xs`} />
         </div>
 
-        <div className="mt-4 overflow-hidden rounded-lg border border-slate-200">
-          <table className="w-full table-fixed text-left text-xs text-slate-700">
+        <div className="mt-4 overflow-x-auto overflow-y-hidden rounded-lg border border-slate-200">
+          <table className="w-full min-w-[900px] table-auto text-left text-xs text-slate-700">
+            <colgroup>
+              <col style={{ width: '110px' }} />
+              <col style={{ width: '140px' }} />
+              <col style={{ width: '120px' }} />
+              <col style={{ width: '130px' }} />
+              <col style={{ width: '190px' }} />
+              <col style={{ width: '110px' }} />
+              <col style={{ width: '130px' }} />
+              <col style={{ width: '40px' }} />
+            </colgroup>
             <thead className="bg-slate-50 text-[11px] uppercase tracking-wide text-slate-500">
               <tr>
                 {['Date', 'Patient name', 'Client account', 'Prescriber', 'Status', 'Priority', 'Phone number', ''].map((heading) => (
@@ -373,7 +383,7 @@ function SmsTableTool({ onBackToTools, rows, setRows }: { onBackToTools: () => v
                     <td className="px-2 py-2 align-top"><input type="text" value={row.account} placeholder="ACC-####" onChange={(event) => updateRow(row.id, 'account', event.target.value)} className="w-full min-w-0 rounded-md border border-slate-200 px-2 py-1.5 text-[11px]" /></td>
                     <td className="px-2 py-2 align-top"><input type="text" value={row.prescriber} placeholder="Dr. Name" onChange={(event) => updateRow(row.id, 'prescriber', event.target.value)} className="w-full min-w-0 rounded-md border border-slate-200 px-2 py-1.5 text-[11px]" /></td>
                     <td className="px-2 py-2 align-top">
-                      <select value={row.status} onChange={(event) => updateRow(row.id, 'status', event.target.value as SmsStatus)} className={`w-full min-w-0 rounded-md border px-2 py-1.5 text-[11px] font-medium ${STATUS_STYLES[row.status]}`}>
+                      <select value={row.status} onChange={(event) => updateRow(row.id, 'status', event.target.value as SmsStatus)} className={`w-full min-w-[180px] rounded-md border px-2 py-1.5 text-[11px] font-medium ${STATUS_STYLES[row.status]}`}>
                         {STATUSES.map((status) => <option key={status}>{status}</option>)}
                       </select>
                     </td>
