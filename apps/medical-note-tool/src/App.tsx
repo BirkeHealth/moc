@@ -27,6 +27,28 @@ type FormData = {
   priority: string
 }
 
+type SmsStatus =
+  | 'Pending Consultation'
+  | 'Approved by prescriber'
+  | 'Notified'
+  | '2nd text sent'
+  | 'Replied to 2nd text'
+  | 'Replied yes'
+  | 'Completed'
+  | 'Text Failed'
+
+type SmsTableRow = {
+  dateEntered: string
+  patientName: string
+  clientAccount: string
+  prescriber: string
+  status: SmsStatus
+  priority: string
+  phoneNumber: string
+  cleanedNumber: string
+  secondTextResponse: string
+}
+
 const ACCOUNT_OPTIONS = [
   'DORAL ACUPUNCTURE',
   'HELIMEDS',
@@ -49,17 +71,30 @@ const MEDICATION_OPTIONS = ['OZEMPIC/WAGOVY', 'ZEPBOUND/MONJAURO']
 
 const PRIORITY_OPTIONS = ['Normal', 'Rush']
 
-const SMS_TABLE_HEADERS = [
-  'Date Entered',
-  'Patient Name',
-  'Client Account',
-  'Prescriber',
-  'Status (e.g., Pending, Approved)',
-  'What is the Priority?',
-  'Phone Number',
-  'Cleaned Number',
-  '2nd Text Response',
-] as const
+const SMS_STATUS_OPTIONS: SmsStatus[] = [
+  'Pending Consultation',
+  'Approved by prescriber',
+  'Notified',
+  '2nd text sent',
+  'Replied to 2nd text',
+  'Replied yes',
+  'Completed',
+  'Text Failed',
+]
+
+const INITIAL_SMS_ROW: SmsTableRow = {
+  dateEntered: '',
+  patientName: '',
+  clientAccount: '',
+  prescriber: '',
+  status: 'Pending Consultation',
+  priority: '',
+  phoneNumber: '',
+  cleanedNumber: '',
+  secondTextResponse: '',
+}
+
+const INITIAL_SMS_ROWS: SmsTableRow[] = [{ ...INITIAL_SMS_ROW }]
 
 const INITIAL_FORM: FormData = {
   patientName: '',
@@ -123,6 +158,16 @@ const MISSING_VALUE = '—'
 // and should be replaced by server-side auth before any sensitive use.
 const TEMPORARY_ACCESS_CODE = 'MOC0813'
 
+const formatDateEntered = (): string => {
+  const today = new Date()
+  const month = String(today.getMonth() + 1).padStart(2, '0')
+  const day = String(today.getDate()).padStart(2, '0')
+  const year = String(today.getFullYear())
+  return `${month}/${day}/${year}`
+}
+
+const getCleanedNumber = (phone: string): string => phone.replace(/\D/g, '')
+
 const getAge = (dob: string): string => {
   if (!dob) return MISSING_VALUE
 
@@ -161,7 +206,12 @@ const fillTemplate = (template: string, values: Record<string, string>): string 
     return result.replace(pattern, value || MISSING_VALUE)
   }, template)
 
-function MedicalNoteTool({ onBackToTools }: { onBackToTools: () => void }) {
+type MedicalNoteToolProps = {
+  onBackToTools: () => void
+  onAddSmsRow: (row: SmsTableRow) => void
+}
+
+function MedicalNoteTool({ onBackToTools, onAddSmsRow }: MedicalNoteToolProps) {
   const [formData, setFormData] = useState<FormData>(INITIAL_FORM)
   const [copyFeedback, setCopyFeedback] = useState('')
 
@@ -197,12 +247,40 @@ function MedicalNoteTool({ onBackToTools }: { onBackToTools: () => void }) {
     setCopyFeedback('Form reset. No data retained.')
   }
 
+  const copyNoteToClipboard = async () => {
+    await navigator.clipboard.writeText(noteText)
+  }
+
   const handleCopy = async (event: FormEvent) => {
     event.preventDefault()
 
     try {
-      await navigator.clipboard.writeText(noteText)
+      await copyNoteToClipboard()
       setCopyFeedback('Note copied to clipboard.')
+    } catch {
+      setCopyFeedback('Unable to copy note. Please copy manually from the preview.')
+    }
+  }
+
+  const handleSmsAndCopy = async (event: FormEvent) => {
+    event.preventDefault()
+
+    try {
+      await copyNoteToClipboard()
+
+      onAddSmsRow({
+        dateEntered: formatDateEntered(),
+        patientName: formData.patientName,
+        clientAccount: formData.account,
+        prescriber: formData.prescriber,
+        status: 'Pending Consultation',
+        priority: formData.priority,
+        phoneNumber: formData.phone,
+        cleanedNumber: getCleanedNumber(formData.phone),
+        secondTextResponse: '',
+      })
+
+      setCopyFeedback('Note copied and SMS TABLE updated.')
     } catch {
       setCopyFeedback('Unable to copy note. Please copy manually from the preview.')
     }
@@ -411,6 +489,9 @@ function MedicalNoteTool({ onBackToTools }: { onBackToTools: () => void }) {
             <button type="button" onClick={handleCopy}>
               Copy Note
             </button>
+            <button type="button" onClick={handleSmsAndCopy}>
+              SMS & Copy
+            </button>
             <button type="button" onClick={handleReset} className="secondary">
               Reset Form
             </button>
@@ -427,7 +508,13 @@ function MedicalNoteTool({ onBackToTools }: { onBackToTools: () => void }) {
   )
 }
 
-function SmsTableTool({ onBackToTools }: { onBackToTools: () => void }) {
+type SmsTableToolProps = {
+  onBackToTools: () => void
+  rows: SmsTableRow[]
+  onUpdateRow: (index: number, key: keyof SmsTableRow, value: string) => void
+}
+
+function SmsTableTool({ onBackToTools, rows, onUpdateRow }: SmsTableToolProps) {
   return (
     <main className="app">
       <div className="app-header">
@@ -443,17 +530,58 @@ function SmsTableTool({ onBackToTools }: { onBackToTools: () => void }) {
           <table className="sms-table">
             <thead>
               <tr>
-                {SMS_TABLE_HEADERS.map((header) => (
-                  <th key={header}>{header}</th>
-                ))}
+                <th>Date Entered</th>
+                <th>Patient Name</th>
+                <th>Client Account</th>
+                <th>Prescriber</th>
+                <th>Status (e.g., Pending, Approved)</th>
+                <th>What is the Priority?</th>
+                <th>Phone Number</th>
+                <th>Cleaned Number</th>
+                <th>2nd Text Response</th>
               </tr>
             </thead>
             <tbody>
-              <tr>
-                {SMS_TABLE_HEADERS.map((header) => (
-                  <td key={header}>—</td>
-                ))}
-              </tr>
+              {rows.map((row, index) => (
+                <tr key={`${row.patientName}-${index}`}>
+                  <td>
+                    <input value={row.dateEntered} onChange={(event) => onUpdateRow(index, 'dateEntered', event.target.value)} />
+                  </td>
+                  <td>
+                    <input value={row.patientName} onChange={(event) => onUpdateRow(index, 'patientName', event.target.value)} />
+                  </td>
+                  <td>
+                    <input value={row.clientAccount} onChange={(event) => onUpdateRow(index, 'clientAccount', event.target.value)} />
+                  </td>
+                  <td>
+                    <input value={row.prescriber} onChange={(event) => onUpdateRow(index, 'prescriber', event.target.value)} />
+                  </td>
+                  <td>
+                    <select value={row.status} onChange={(event) => onUpdateRow(index, 'status', event.target.value)}>
+                      {SMS_STATUS_OPTIONS.map((option) => (
+                        <option key={option} value={option}>
+                          {option}
+                        </option>
+                      ))}
+                    </select>
+                  </td>
+                  <td>
+                    <input value={row.priority} onChange={(event) => onUpdateRow(index, 'priority', event.target.value)} />
+                  </td>
+                  <td>
+                    <input value={row.phoneNumber} onChange={(event) => onUpdateRow(index, 'phoneNumber', event.target.value)} />
+                  </td>
+                  <td>
+                    <input value={row.cleanedNumber} onChange={(event) => onUpdateRow(index, 'cleanedNumber', event.target.value)} />
+                  </td>
+                  <td>
+                    <input
+                      value={row.secondTextResponse}
+                      onChange={(event) => onUpdateRow(index, 'secondTextResponse', event.target.value)}
+                    />
+                  </td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>
@@ -467,6 +595,7 @@ function App() {
   const [accessError, setAccessError] = useState('')
   const [isAccessGranted, setIsAccessGranted] = useState(false)
   const [selectedTool, setSelectedTool] = useState<ToolSelection>(null)
+  const [smsRows, setSmsRows] = useState<SmsTableRow[]>(INITIAL_SMS_ROWS)
 
   const handleAccessSubmit = (event: FormEvent) => {
     event.preventDefault()
@@ -478,6 +607,27 @@ function App() {
     }
 
     setAccessError('Invalid access code. Please try again.')
+  }
+
+  const handleAddSmsRow = (row: SmsTableRow) => {
+    setSmsRows((current) => [...current, row])
+    setSelectedTool('sms-table')
+  }
+
+  const handleUpdateSmsRow = (index: number, key: keyof SmsTableRow, value: string) => {
+    setSmsRows((current) =>
+      current.map((row, rowIndex) => {
+        if (rowIndex !== index) return row
+
+        const updatedRow = { ...row, [key]: value }
+
+        if (key === 'phoneNumber') {
+          updatedRow.cleanedNumber = getCleanedNumber(value)
+        }
+
+        return updatedRow
+      }),
+    )
   }
 
   if (!isAccessGranted) {
@@ -527,10 +677,10 @@ function App() {
   }
 
   if (selectedTool === 'sms-table') {
-    return <SmsTableTool onBackToTools={() => setSelectedTool(null)} />
+    return <SmsTableTool onBackToTools={() => setSelectedTool(null)} rows={smsRows} onUpdateRow={handleUpdateSmsRow} />
   }
 
-  return <MedicalNoteTool onBackToTools={() => setSelectedTool(null)} />
+  return <MedicalNoteTool onBackToTools={() => setSelectedTool(null)} onAddSmsRow={handleAddSmsRow} />
 }
 
 export default App
