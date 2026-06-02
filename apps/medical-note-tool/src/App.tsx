@@ -1,6 +1,6 @@
 import './App.css'
 
-type ToolSelection = 'medical-note' | 'sms-table' | null
+const MISSING_VALUE = '—'
 
 type YesNo = '' | 'yes' | 'no'
 
@@ -23,29 +23,7 @@ type FormData = {
   account: string
   prescriber: string
   prescribedMedication: string
-  priority: string
 }
-
-const ACCOUNT_OPTIONS = [
-  'DORAL ACUPUNCTURE',
-  'HELIMEDS',
-  'PEAKS CURATIVE',
-  'CLINIC SECRET',
-  'TRUE LIO',
-  'WHITECOAT MD',
-]
-
-const PRESCRIBER_OPTIONS = [
-  'ALBERTO NUNEZ PINA',
-  'YADIRA JEAN-LOUIS',
-  'LUK JEAN-LOUIS',
-  'EMILIO LUIS GONZALEZ',
-  'CHARLES SAROSY',
-  'ELIAZER MORGAN',
-]
-
-const MEDICATION_OPTIONS = ['OZEMPIC/WAGOVY', 'ZEPBOUND/MONJAURO']
-const PRIORITY_OPTIONS = ['Normal', 'Rush']
 
 const INITIAL_FORM: FormData = {
   patientName: '',
@@ -66,7 +44,6 @@ const INITIAL_FORM: FormData = {
   account: '',
   prescriber: '',
   prescribedMedication: '',
-  priority: 'Normal',
 }
 
 const MEDICAL_NOTE_TEMPLATE = `The patient {{PATIENT NAME}} is a {{AGE}} year old {{GENDER}} with a PMH of {{PMH}} seeking care for Weight Loss. Body Mass Index is {{BMI}}. Patient {{HAS_WEIGHT_LOSS_PROGRAM}} tried any weight loss programs. The patient {{HAS_GLP1}} tried any GLP1 medications in the past. The patient’s last dose of GLP1 medication or any weight loss related medication generic or non generic is {{LAST DOSE}}
@@ -103,9 +80,6 @@ Will aim for no more than 1-2 lbs per week of weight loss and hope to achieve a 
 Recommend drinking sufficient water and working on adhering to a balanced diet with appropriate portion control.
 
 Will follow up with patient in 3-4 weeks to assess response and side effects.`
-
-const MISSING_VALUE = '—'
-const TEMPORARY_ACCESS_CODE = 'MOC0813'
 
 const getAge = (dob: string): string => {
   if (!dob) return MISSING_VALUE
@@ -269,6 +243,14 @@ const initializeSmsTable = (container: HTMLElement) => {
     return
   }
 
+  const escapeHtml = (value: string) =>
+    value
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;')
+
   const matchesFilters = (row: SmsRow) => {
     const search = searchInput.value.trim().toLowerCase()
     const status = statusFilter.value
@@ -302,16 +284,16 @@ const initializeSmsTable = (container: HTMLElement) => {
         (row) => `
           <tr data-row-id="${row.id}">
             <td>
-              <input data-field="dateEntered" type="date" value="${row.dateEntered}" />
+              <input data-field="dateEntered" type="date" value="${escapeHtml(row.dateEntered)}" />
             </td>
             <td>
-              <input data-field="patientName" data-focus-target="${row.id}" type="text" value="${row.patientName.replace(/"/g, '&quot;')}" />
+              <input data-field="patientName" data-focus-target="${row.id}" type="text" value="${escapeHtml(row.patientName)}" />
             </td>
             <td>
-              <input data-field="clientAccount" type="text" inputmode="numeric" placeholder="ACC-1234" value="${row.clientAccount.replace(/"/g, '&quot;')}" />
+              <input data-field="clientAccount" type="text" inputmode="numeric" placeholder="ACC-1234" value="${escapeHtml(row.clientAccount)}" />
             </td>
             <td>
-              <input data-field="prescriber" type="text" value="${row.prescriber.replace(/"/g, '&quot;')}" />
+              <input data-field="prescriber" type="text" value="${escapeHtml(row.prescriber)}" />
             </td>
             <td>
               <label class="sms-select-wrap">
@@ -335,7 +317,7 @@ const initializeSmsTable = (container: HTMLElement) => {
               </label>
             </td>
             <td>
-              <input data-field="phoneNumber" type="tel" value="${row.phoneNumber.replace(/"/g, '&quot;')}" />
+              <input data-field="phoneNumber" type="tel" value="${escapeHtml(row.phoneNumber)}" />
             </td>
             <td class="sms-delete-cell">
               <button type="button" class="sms-delete-button" data-action="delete" aria-label="Delete row">✕</button>
@@ -398,15 +380,19 @@ const initializeSmsTable = (container: HTMLElement) => {
     updateRow(rowId, field, target.value)
   })
 
-  tableBody.addEventListener('blur', (event) => {
-    const target = event.target as HTMLInputElement | HTMLSelectElement
-    const rowElement = target.closest<HTMLTableRowElement>('tr[data-row-id]')
-    if (!rowElement) return
-    const rowId = Number(rowElement.dataset.rowId)
-    const field = target.dataset.field as keyof Omit<SmsRow, 'id'> | undefined
-    if (!field) return
-    updateRow(rowId, field, target.value)
-  }, true)
+  tableBody.addEventListener(
+    'blur',
+    (event) => {
+      const target = event.target as HTMLInputElement | HTMLSelectElement
+      const rowElement = target.closest<HTMLTableRowElement>('tr[data-row-id]')
+      if (!rowElement) return
+      const rowId = Number(rowElement.dataset.rowId)
+      const field = target.dataset.field as keyof Omit<SmsRow, 'id'> | undefined
+      if (!field) return
+      updateRow(rowId, field, target.value)
+    },
+    true,
+  )
 
   tableBody.addEventListener('click', (event) => {
     const target = event.target as HTMLElement
@@ -423,9 +409,6 @@ const initializeSmsTable = (container: HTMLElement) => {
 }
 
 function App() {
-  const root = document.querySelector('#root')
-  if (!root) return null
-
   const noteText = fillTemplate(MEDICAL_NOTE_TEMPLATE, {
     'PATIENT NAME': INITIAL_FORM.patientName || MISSING_VALUE,
     AGE: getAge(INITIAL_FORM.dob),
@@ -443,7 +426,7 @@ function App() {
     'ZEPBOUND/MONJAURO or OZEMPIC/WAGOVY': INITIAL_FORM.prescribedMedication || MISSING_VALUE,
   })
 
-  root.innerHTML = `
+  const html = `
     <main class="app sms-fullwidth-app">
       <div class="app-header">
         <div class="tool-tabs" role="tablist" aria-label="Tools">
@@ -467,28 +450,38 @@ function App() {
     </main>
   `
 
-  const medicalNoteView = root.querySelector<HTMLElement>('#medical-note-view')
-  const smsTableView = root.querySelector<HTMLElement>('#sms-table-view')
-  const tabs = Array.from(root.querySelectorAll<HTMLButtonElement>('.tool-tab'))
+  return (
+    <div
+      dangerouslySetInnerHTML={{
+        __html: html,
+      }}
+      ref={(node) => {
+        if (!node || node.dataset.initialized === 'true') return
+        node.dataset.initialized = 'true'
 
-  tabs.forEach((tab) => {
-    tab.addEventListener('click', () => {
-      const tool = tab.dataset.tool
-      tabs.forEach((button) => button.classList.toggle('active', button === tab))
-      if (tool === 'medical-note') {
-        medicalNoteView?.removeAttribute('hidden')
-        smsTableView?.setAttribute('hidden', 'true')
-      } else {
-        smsTableView?.removeAttribute('hidden')
-        medicalNoteView?.setAttribute('hidden', 'true')
-      }
-    })
-  })
+        const medicalNoteView = node.querySelector<HTMLElement>('#medical-note-view')
+        const smsTableView = node.querySelector<HTMLElement>('#sms-table-view')
+        const tabs = Array.from(node.querySelectorAll<HTMLButtonElement>('.tool-tab'))
 
-  const smsContainer = root.querySelector<HTMLElement>('.sms-workflow-page')
-  if (smsContainer) initializeSmsTable(smsContainer)
+        tabs.forEach((tab) => {
+          tab.addEventListener('click', () => {
+            const tool = tab.dataset.tool
+            tabs.forEach((button) => button.classList.toggle('active', button === tab))
+            if (tool === 'medical-note') {
+              medicalNoteView?.removeAttribute('hidden')
+              smsTableView?.setAttribute('hidden', 'true')
+            } else {
+              smsTableView?.removeAttribute('hidden')
+              medicalNoteView?.setAttribute('hidden', 'true')
+            }
+          })
+        })
 
-  return null
+        const smsContainer = node.querySelector<HTMLElement>('.sms-workflow-page')
+        if (smsContainer) initializeSmsTable(smsContainer)
+      }}
+    />
+  )
 }
 
 export default App
