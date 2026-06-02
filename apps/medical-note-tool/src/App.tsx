@@ -27,32 +27,25 @@ type FormData = {
   priority: string
 }
 
-type SmsStatus = 'Received' | 'Pending Consultation' | 'Approved' | 'Cancelled' | 'Rejected' | 'Incomplete' | 'Needs Clarification' | 'Missing Forms' | 'RTS' | 'ScriptSure Error'
-type SmsPriority = '1 - High' | '2 - Medium' | '3 - Normal'
+type SmsStatus = 'Received' | 'Pending Consultation' | 'Approved' | 'Needs Clarification'
+type SmsPriority = 'High' | 'Medium' | 'Normal'
 
 type SmsRow = {
   id: number
-  dateModified: string
-  visitId: string
-  status: SmsStatus
-  note: string
-  rxStatus: string
-  priority: SmsPriority
-  visitType: string
-  clinic: string
-  prescriber: string
+  dateEntered: string
   patient: string
-  dateOfBirth: string
+  account: string
+  prescriber: string
+  status: SmsStatus
+  priority: SmsPriority
   phone: string
-  state: string
+  note: string
 }
 
 type FilterState = {
   search: string
   status: '' | SmsStatus
   priority: '' | SmsPriority
-  dateFrom: string
-  dateTo: string
 }
 
 const ACCOUNT_OPTIONS = [
@@ -75,9 +68,8 @@ const PRESCRIBER_OPTIONS = [
 
 const MEDICATION_OPTIONS = ['OZEMPIC/WAGOVY', 'ZEPBOUND/MONJAURO']
 const NOTE_PRIORITY_OPTIONS = ['Normal', 'Rush']
-const SMS_STATUS_OPTIONS: SmsStatus[] = ['Received', 'Pending Consultation', 'Approved', 'Cancelled', 'Rejected', 'Incomplete', 'Needs Clarification', 'Missing Forms', 'RTS', 'ScriptSure Error']
-const SMS_PRIORITY_OPTIONS: SmsPriority[] = ['1 - High', '2 - Medium', '3 - Normal']
-const RX_STATUS_OPTIONS = ['Not Received', 'Received', 'Pending', 'Sent']
+const SMS_STATUS_OPTIONS: SmsStatus[] = ['Received', 'Pending Consultation', 'Approved', 'Needs Clarification']
+const SMS_PRIORITY_OPTIONS: SmsPriority[] = ['High', 'Medium', 'Normal']
 
 const INITIAL_FORM: FormData = {
   patientName: '',
@@ -104,51 +96,36 @@ const INITIAL_FORM: FormData = {
 const INITIAL_SMS_ROWS: SmsRow[] = [
   {
     id: 1,
-    dateModified: '2026-06-02 09:27pm',
-    visitId: '1031654',
-    status: 'Received',
-    note: '',
-    rxStatus: 'Not Received',
-    priority: '3 - Normal',
-    visitType: 'Weightlossfollowup',
-    clinic: 'Helimeds',
-    prescriber: 'None',
+    dateEntered: '2026-06-02',
     patient: 'RyeAnne Ricker',
-    dateOfBirth: '1990-12-07',
+    account: 'HELIMEDS',
+    prescriber: 'ALBERTO NUNEZ PINA',
+    status: 'Received',
+    priority: 'Normal',
     phone: '(425) 891-0704',
-    state: 'CO',
+    note: '',
   },
   {
     id: 2,
-    dateModified: '2026-06-01 09:25pm',
-    visitId: '1031653',
-    status: 'Received',
-    note: '',
-    rxStatus: 'Not Received',
-    priority: '3 - Normal',
-    visitType: 'Weightlossfollowup',
-    clinic: 'Helimeds',
-    prescriber: 'None',
+    dateEntered: '2026-06-01',
     patient: 'Karina Ferdynus',
-    dateOfBirth: '1979-11-07',
+    account: 'HELIMEDS',
+    prescriber: 'YADIRA JEAN-LOUIS',
+    status: 'Pending Consultation',
+    priority: 'Medium',
     phone: '(312) 720-3212',
-    state: 'IL',
+    note: '',
   },
   {
     id: 3,
-    dateModified: '2026-06-01 09:07pm',
-    visitId: '1031650',
-    status: 'Needs Clarification',
-    note: '',
-    rxStatus: 'Not Received',
-    priority: '1 - High',
-    visitType: 'Weight Management Follow Up',
-    clinic: 'Clinic Secret',
-    prescriber: 'None',
+    dateEntered: '2026-06-01',
     patient: 'Nirav Shah',
-    dateOfBirth: '1976-08-28',
+    account: 'CLINIC SECRET',
+    prescriber: 'CHARLES SAROSY',
+    status: 'Needs Clarification',
+    priority: 'High',
     phone: '(706) 871-0210',
-    state: 'GA',
+    note: 'Missing intake details',
   },
 ]
 
@@ -156,8 +133,6 @@ const INITIAL_FILTERS: FilterState = {
   search: '',
   status: '',
   priority: '',
-  dateFrom: '2026-05-29',
-  dateTo: '2026-06-02',
 }
 
 const MEDICAL_NOTE_TEMPLATE = `The patient {{PATIENT NAME}} is a {{AGE}} year old {{GENDER}} with a PMH of {{PMH}} seeking care for Weight Loss. Body Mass Index is {{BMI}}. Patient {{HAS_WEIGHT_LOSS_PROGRAM}} tried any weight loss programs. The patient {{HAS_GLP1}} tried any GLP1 medications in the past. The patient’s last dose of GLP1 medication or any weight loss related medication generic or non generic is {{LAST DOSE}}
@@ -198,23 +173,8 @@ Will follow up with patient in 3-4 weeks to assess response and side effects.`
 const MISSING_VALUE = '—'
 const TEMPORARY_ACCESS_CODE = 'MOC0813'
 
-const statusClassName: Record<SmsStatus, string> = {
-  Received: 'sms-chip',
-  'Pending Consultation': 'sms-chip',
-  Approved: 'sms-chip',
-  Cancelled: 'sms-chip',
-  Rejected: 'sms-chip',
-  Incomplete: 'sms-chip',
-  'Needs Clarification': 'sms-chip',
-  'Missing Forms': 'sms-chip',
-  RTS: 'sms-chip',
-  'ScriptSure Error': 'sms-chip',
-}
-
-const formatDateEntered = () => new Date().toISOString().slice(0, 16).replace('T', ' ')
-const createVisitId = (id: number) => String(1032000 + id)
-const mapNotePriorityToSmsPriority = (value: string): SmsPriority => (value === 'Rush' ? '1 - High' : '3 - Normal')
-const formatClinicFromAccount = (value: string) => (value ? value.replaceAll('_', ' ') : '')
+const formatToday = () => new Date().toISOString().slice(0, 10)
+const mapNotePriorityToSmsPriority = (value: string): SmsPriority => (value === 'Rush' ? 'High' : 'Normal')
 
 const getAge = (dob: string): string => {
   if (!dob) return MISSING_VALUE
@@ -287,19 +247,14 @@ function MedicalNoteTool({ onBackToTools, onAddSmsRow }: { onBackToTools: () => 
       await navigator.clipboard.writeText(noteText)
       onAddSmsRow({
         id: Date.now(),
-        dateModified: formatDateEntered(),
-        visitId: createVisitId(Date.now() % 1000),
-        status: 'Pending Consultation',
-        note: '',
-        rxStatus: 'Not Received',
-        priority: mapNotePriorityToSmsPriority(formData.priority),
-        visitType: 'Weightlossfollowup',
-        clinic: formatClinicFromAccount(formData.account),
-        prescriber: formData.prescriber || 'None',
+        dateEntered: formatToday(),
         patient: formData.patientName,
-        dateOfBirth: formData.dob,
+        account: formData.account,
+        prescriber: formData.prescriber,
+        status: 'Pending Consultation',
+        priority: mapNotePriorityToSmsPriority(formData.priority),
         phone: formData.phone,
-        state: '',
+        note: '',
       })
       setCopyFeedback('Note copied and added to SMS table.')
     } catch {
@@ -363,14 +318,14 @@ function MedicalNoteTool({ onBackToTools, onAddSmsRow }: { onBackToTools: () => 
 
 function SmsTableTool({ onBackToTools, rows, setRows }: { onBackToTools: () => void; rows: SmsRow[]; setRows: React.Dispatch<React.SetStateAction<SmsRow[]>> }) {
   const [filters, setFilters] = useState<FilterState>(INITIAL_FILTERS)
-  const [entriesPerPage, setEntriesPerPage] = useState('25')
   const nextIdRef = useRef(Math.max(0, ...rows.map((row) => row.id)) + 1)
   const patientInputRefs = useRef<Record<number, HTMLInputElement | null>>({})
 
   const filteredRows = useMemo(() => {
     const search = filters.search.trim().toLowerCase()
     return rows.filter((row) => {
-      const matchesSearch = !search || row.patient.toLowerCase().includes(search) || row.prescriber.toLowerCase().includes(search)
+      const matchesSearch =
+        !search || row.patient.toLowerCase().includes(search) || row.prescriber.toLowerCase().includes(search) || row.account.toLowerCase().includes(search)
       const matchesStatus = !filters.status || row.status === filters.status
       const matchesPriority = !filters.priority || row.priority === filters.priority
       return matchesSearch && matchesStatus && matchesPriority
@@ -381,152 +336,129 @@ function SmsTableTool({ onBackToTools, rows, setRows }: { onBackToTools: () => v
     total: rows.length,
     pending: rows.filter((row) => row.status === 'Pending Consultation').length,
     approved: rows.filter((row) => row.status === 'Approved').length,
-    highPriority: rows.filter((row) => row.priority === '1 - High').length,
+    highPriority: rows.filter((row) => row.priority === 'High').length,
   }), [rows])
 
   const updateRow = <K extends keyof Omit<SmsRow, 'id'>>(rowId: number, field: K, value: SmsRow[K]) => {
     setRows((current) => current.map((row) => (row.id === rowId ? { ...row, [field]: value } : row)))
   }
 
-  const handleTextChange = (rowId: number, field: keyof Pick<SmsRow, 'dateModified' | 'visitId' | 'note' | 'visitType' | 'clinic' | 'patient' | 'dateOfBirth' | 'phone' | 'state'>) =>
-    (event: ChangeEvent<HTMLInputElement>) => updateRow(rowId, field, event.target.value)
-
-  const handleSelectChange = (rowId: number, field: 'status' | 'priority' | 'rxStatus' | 'prescriber') =>
-    (event: ChangeEvent<HTMLSelectElement>) => updateRow(rowId, field, event.target.value as SmsRow[typeof field])
+  const handleInputChange = (rowId: number, field: keyof Omit<SmsRow, 'id'>) =>
+    (event: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => updateRow(rowId, field, event.target.value as SmsRow[typeof field])
 
   const handleAddEntry = () => {
     const id = nextIdRef.current++
-    setRows((current) => [...current, {
-      id,
-      dateModified: formatDateEntered(),
-      visitId: createVisitId(id),
-      status: 'Received',
-      note: '',
-      rxStatus: 'Not Received',
-      priority: '3 - Normal',
-      visitType: 'Weightlossfollowup',
-      clinic: 'Helimeds',
-      prescriber: 'None',
-      patient: '',
-      dateOfBirth: '',
-      phone: '',
-      state: '',
-    }])
+    setRows((current) => [
+      {
+        id,
+        dateEntered: formatToday(),
+        patient: '',
+        account: '',
+        prescriber: '',
+        status: 'Received',
+        priority: 'Normal',
+        phone: '',
+        note: '',
+      },
+      ...current,
+    ])
     requestAnimationFrame(() => patientInputRefs.current[id]?.focus())
   }
 
-  const handleSearchVisits = (event: FormEvent) => event.preventDefault()
+  const handleDeleteRow = (rowId: number) => {
+    setRows((current) => current.filter((row) => row.id !== rowId))
+    delete patientInputRefs.current[rowId]
+  }
 
   return (
-    <main className="app emed-app">
-      <aside className="emed-sidebar">
-        <div className="emed-brand">eMedical Health</div>
-        <nav>
-          <div className="emed-nav-section">TASKS</div>
-          <a className="emed-nav-link">My Tasks</a>
-          <div className="emed-nav-section">EMED</div>
-          <a className="emed-nav-link">Script Search</a>
-          <a className="emed-nav-link">Clinic Files</a>
-          <a className="emed-nav-link active">SMS Messages</a>
-          <div className="emed-nav-section">CLINIC PORTAL</div>
-          <a className="emed-nav-link">Visits</a>
-          <a className="emed-nav-link">Prescriptions</a>
-          <a className="emed-nav-link">Documents</a>
-        </nav>
-      </aside>
-      <div className="emed-content">
-        <div className="app-header emed-topbar">
-          <button type="button" className="secondary" onClick={onBackToTools}>Back to tools</button>
+    <main className="app sms-compact-page">
+      <div className="app-header sms-compact-header">
+        <div>
+          <h1>SMS Workflow Table</h1>
+          <p className="privacy">Compact spreadsheet view for fast editing.</p>
         </div>
-
-        <section className="sms-hero-panel">
-          <div className="sms-hero-title">VISIT STATUS</div>
-          <div className="sms-chip-row">
-            {SMS_STATUS_OPTIONS.map((status) => <button key={status} type="button" className={statusClassName[status]} onClick={() => setFilters((current) => ({ ...current, status }))}>{status}</button>)}
-          </div>
-          <form className="sms-date-row" onSubmit={handleSearchVisits}>
-            <div className="sms-date-title">DATE RANGE</div>
-            <label>From:<input type="date" value={filters.dateFrom} onChange={(event) => setFilters((current) => ({ ...current, dateFrom: event.target.value }))} /></label>
-            <label>To:<input type="date" value={filters.dateTo} onChange={(event) => setFilters((current) => ({ ...current, dateTo: event.target.value }))} /></label>
-            <button type="submit" className="sms-search-button">Search Visits</button>
-            <button type="button" className="sms-reset-button" onClick={() => setFilters(INITIAL_FILTERS)}>Reset</button>
-          </form>
-        </section>
-
-        <section className="sms-table-card">
-          <header className="sms-table-card-header">
-            <div>
-              <strong>MOCT Visits [{stats.total}]</strong>
-              <span className="sms-export-pill">Excel</span>
-            </div>
-          </header>
-
-          <div className="sms-stats sms-stats-compact" aria-label="Summary stats">
-            <article className="sms-stat-card"><span className="sms-stat-label">Total</span><strong>{stats.total}</strong></article>
-            <article className="sms-stat-card"><span className="sms-stat-label">Pending</span><strong>{stats.pending}</strong></article>
-            <article className="sms-stat-card"><span className="sms-stat-label">Approved</span><strong>{stats.approved}</strong></article>
-            <article className="sms-stat-card"><span className="sms-stat-label">High priority</span><strong>{stats.highPriority}</strong></article>
-          </div>
-
-          <div className="sms-table-toolbar">
-            <div className="sms-entries-control">
-              <select value={entriesPerPage} onChange={(event) => setEntriesPerPage(event.target.value)}>
-                <option value="25">25</option>
-                <option value="50">50</option>
-                <option value="100">100</option>
-              </select>
-              <span>entries per page</span>
-            </div>
-            <div className="sms-toolbar-actions">
-              <button type="button" className="sms-add-inline" onClick={handleAddEntry}>Add +</button>
-              <input className="sms-search-input" placeholder="Search..." value={filters.search} onChange={(event) => setFilters((current) => ({ ...current, search: event.target.value }))} />
-            </div>
-          </div>
-
-          <div className="sms-table-scroll">
-            <table className="sms-table sms-table-emed" aria-label="SMS workflow tracking table">
-              <thead>
-                <tr>
-                  <th>Date Modified</th>
-                  <th>Visit Id</th>
-                  <th>Status</th>
-                  <th>Note</th>
-                  <th>Rx Status</th>
-                  <th>Priority</th>
-                  <th>Visit Type</th>
-                  <th>Clinic</th>
-                  <th>Prescriber</th>
-                  <th>Patient</th>
-                  <th>Date Of Birth</th>
-                  <th>Phone</th>
-                  <th>State</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredRows.map((row) => (
-                  <tr key={row.id}>
-                    <td><input value={row.dateModified} onChange={handleTextChange(row.id, 'dateModified')} /></td>
-                    <td><input value={row.visitId} onChange={handleTextChange(row.id, 'visitId')} /></td>
-                    <td><select value={row.status} onChange={handleSelectChange(row.id, 'status')}>{SMS_STATUS_OPTIONS.map((status) => <option key={status} value={status}>{status}</option>)}</select></td>
-                    <td><input value={row.note} onChange={handleTextChange(row.id, 'note')} /></td>
-                    <td><select value={row.rxStatus} onChange={handleSelectChange(row.id, 'rxStatus')}>{RX_STATUS_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}</select></td>
-                    <td><select value={row.priority} onChange={handleSelectChange(row.id, 'priority')}>{SMS_PRIORITY_OPTIONS.map((priority) => <option key={priority} value={priority}>{priority}</option>)}</select></td>
-                    <td><input value={row.visitType} onChange={handleTextChange(row.id, 'visitType')} /></td>
-                    <td><input value={row.clinic} onChange={handleTextChange(row.id, 'clinic')} /></td>
-                    <td><select value={row.prescriber} onChange={handleSelectChange(row.id, 'prescriber')}><option value="None">None</option>{PRESCRIBER_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}</select></td>
-                    <td><input ref={(node) => { patientInputRefs.current[row.id] = node }} value={row.patient} onChange={handleTextChange(row.id, 'patient')} /></td>
-                    <td><input type="date" value={row.dateOfBirth} onChange={handleTextChange(row.id, 'dateOfBirth')} /></td>
-                    <td><input value={row.phone} onChange={handleTextChange(row.id, 'phone')} /></td>
-                    <td><input value={row.state} onChange={handleTextChange(row.id, 'state')} /></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          {filteredRows.length === 0 && <div className="sms-empty-state">No rows match your filters.</div>}
-        </section>
+        <div className="sms-header-actions">
+          <button type="button" className="secondary" onClick={onBackToTools}>Back to tools</button>
+          <button type="button" onClick={handleAddEntry}>Add row</button>
+        </div>
       </div>
+
+      <section className="sms-compact-controls">
+        <div className="sms-stat-strip">
+          <span>Total <strong>{stats.total}</strong></span>
+          <span>Pending <strong>{stats.pending}</strong></span>
+          <span>Approved <strong>{stats.approved}</strong></span>
+          <span>High <strong>{stats.highPriority}</strong></span>
+        </div>
+        <div className="sms-filter-strip">
+          <input
+            className="sms-search-input compact"
+            placeholder="Search patient, account, or prescriber"
+            value={filters.search}
+            onChange={(event) => setFilters((current) => ({ ...current, search: event.target.value }))}
+          />
+          <select value={filters.status} onChange={(event) => setFilters((current) => ({ ...current, status: event.target.value as FilterState['status'] }))}>
+            <option value="">All Statuses</option>
+            {SMS_STATUS_OPTIONS.map((status) => <option key={status} value={status}>{status}</option>)}
+          </select>
+          <select value={filters.priority} onChange={(event) => setFilters((current) => ({ ...current, priority: event.target.value as FilterState['priority'] }))}>
+            <option value="">All Priorities</option>
+            {SMS_PRIORITY_OPTIONS.map((priority) => <option key={priority} value={priority}>{priority}</option>)}
+          </select>
+        </div>
+      </section>
+
+      <section className="sms-sheet-card">
+        <table className="sms-sheet-table" aria-label="SMS workflow spreadsheet">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Patient</th>
+              <th>Account</th>
+              <th>Prescriber</th>
+              <th>Status</th>
+              <th>Priority</th>
+              <th>Phone</th>
+              <th>Note</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {filteredRows.map((row) => (
+              <tr key={row.id}>
+                <td><input type="date" value={row.dateEntered} onChange={handleInputChange(row.id, 'dateEntered')} /></td>
+                <td><input ref={(node) => { patientInputRefs.current[row.id] = node }} value={row.patient} onChange={handleInputChange(row.id, 'patient')} /></td>
+                <td>
+                  <select value={row.account} onChange={handleInputChange(row.id, 'account')}>
+                    <option value="">Select</option>
+                    {ACCOUNT_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}
+                  </select>
+                </td>
+                <td>
+                  <select value={row.prescriber} onChange={handleInputChange(row.id, 'prescriber')}>
+                    <option value="">Select</option>
+                    {PRESCRIBER_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}
+                  </select>
+                </td>
+                <td>
+                  <select value={row.status} onChange={handleInputChange(row.id, 'status')}>
+                    {SMS_STATUS_OPTIONS.map((status) => <option key={status} value={status}>{status}</option>)}
+                  </select>
+                </td>
+                <td>
+                  <select value={row.priority} onChange={handleInputChange(row.id, 'priority')}>
+                    {SMS_PRIORITY_OPTIONS.map((priority) => <option key={priority} value={priority}>{priority}</option>)}
+                  </select>
+                </td>
+                <td><input value={row.phone} onChange={handleInputChange(row.id, 'phone')} /></td>
+                <td><input value={row.note} onChange={handleInputChange(row.id, 'note')} /></td>
+                <td className="sms-delete-cell"><button type="button" className="sms-delete-button compact" onClick={() => handleDeleteRow(row.id)}>✕</button></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {filteredRows.length === 0 && <div className="sms-empty-state">No rows match your filters.</div>}
+      </section>
     </main>
   )
 }
