@@ -438,10 +438,16 @@ function SmsTableTool({ onBackToTools, rows, setRows }: { onBackToTools: () => v
       if (response.ok) return { ok: true } satisfies SmsSendResult
 
       const detail = getSmsApiErrorDetail(await response.text())
-      if (response.status === 401 || response.status === 403) {
+      if (response.status === 401) {
         return {
           ok: false,
-          error: `Invalid RingCentral credentials or from number. Confirm the access token is current and the from number belongs to the account.${detail ? ` ${detail}` : ''}`,
+          error: `Invalid RingCentral credentials. Confirm the access token is current.${detail ? ` ${detail}` : ''}`,
+        } satisfies SmsSendResult
+      }
+      if (response.status === 403) {
+        return {
+          ok: false,
+          error: `RingCentral denied permission to send from this number or extension. Confirm the from number is enabled for the current account.${detail ? ` ${detail}` : ''}`,
         } satisfies SmsSendResult
       }
       return {
