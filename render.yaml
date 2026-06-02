@@ -4,3 +4,33 @@ services:
     rootDir: apps/medical-note-tool
     buildCommand: yarn && yarn build
     staticPublishPath: dist
+    envVars:
+      # Set to the deployed URL of the medical-note-api service so the frontend
+      # knows where to send SMS requests, e.g. https://medical-note-api.onrender.com
+      # Leave unset if you configure a reverse-proxy so /api is on the same origin.
+      - key: VITE_API_URL
+        sync: false
+
+  - type: web
+    name: medical-note-api
+    runtime: node
+    rootDir: apps/api
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    envVars:
+      # Required: RingCentral JWT auth credentials.
+      # Set these in the Render dashboard (Environment > Secret Files / Env Vars).
+      - key: RINGCENTRAL_JWT
+        sync: false
+      - key: RINGCENTRAL_CLIENT_ID
+        sync: false
+      - key: RINGCENTRAL_CLIENT_SECRET
+        sync: false
+      # Required: SMS sender number in E.164 format, e.g. +13055550123
+      - key: RINGCENTRAL_FROM_NUMBER
+        sync: false
+      # Recommended: set to the deployed frontend URL to restrict CORS,
+      # e.g. https://medical-note-tool.onrender.com
+      # If omitted the API accepts requests from any origin.
+      - key: CORS_ORIGIN
+        sync: false

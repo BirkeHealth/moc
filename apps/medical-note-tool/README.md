@@ -1,17 +1,26 @@
 # Medical Note Tool
 
-Static React app for generating medical note templates in-browser only.
+Static React app for generating medical note templates and sending SMS via a server-side RingCentral integration.
 
 ## HIPAA / Data Handling
 
-- No backend, database, analytics, or API calls are used.
+- No database, analytics, or third-party trackers are used.
 - Patient data is only kept in browser memory while the page is open.
 - `Copy Note` copies to clipboard; `Reset Form` clears the in-memory form.
-- No information is stored or transmitted by this app.
+- SMS is sent via the `medical-note-api` backend — no RingCentral credentials are stored in the browser or embedded in client-side code.
 
 ## Local Development
 
-From the repository root:
+The SMS feature requires the `medical-note-api` server running locally. Start it first:
+
+```bash
+cd apps/api
+cp .env.example .env   # fill in your RingCentral credentials
+npm install
+npm run dev
+```
+
+Then start the frontend (in a separate terminal):
 
 ```bash
 cd apps/medical-note-tool
@@ -21,11 +30,20 @@ npm run dev
 
 Open the URL printed by Vite (normally `http://localhost:5173`).
 
+The Vite dev server proxies `/api` requests to `http://localhost:3001` automatically, so SMS sending works out of the box once the API server is running.
+
 ## Production Build
 
 ```bash
 cd apps/medical-note-tool
 npm run build
+```
+
+For production deployments where the frontend and API are on different origins,
+set `VITE_API_URL` at build time to the deployed API URL:
+
+```bash
+VITE_API_URL=https://medical-note-api.onrender.com npm run build
 ```
 
 Build output is generated in `dist/`.
