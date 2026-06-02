@@ -31,6 +31,7 @@ services:
         sync: false
       # Recommended: set to the deployed frontend URL to restrict CORS,
       # e.g. https://medical-note-tool.onrender.com
-      # If omitted the API accepts requests from any origin.
+      # If omitted, cross-origin browser requests to the API will fail because
+      # CORS headers are not added unless this allowlist is configured.
       - key: CORS_ORIGIN
         sync: false
