@@ -2,23 +2,59 @@
 
 ## Render deployment
 
-This repository deploys as **two Render services**:
+This repository deploys as a **single Render web service** that builds both the
+frontend and the API, then serves everything from one Node process.
 
-1. **Frontend (Static Site)**
-   - Root directory: `apps/medical-note-tool`
-   - Build command: `yarn && yarn build` (as defined in `render.yaml`)
-   - Publish directory: `dist`
-   - Required env var: `VITE_API_URL` (set to your API service URL, for example `https://<your-api-service>.onrender.com`)
+### How it works
 
-2. **API (Web Service)**
-   - Root directory: `apps/api` (**do not deploy the repository root as the API service**)
-   - Build command: `npm install && npm run build`
-   - Start command: `npm start`
-   - Required env vars:
-     - `RINGCENTRAL_JWT`
-     - `RINGCENTRAL_CLIENT_ID`
-     - `RINGCENTRAL_CLIENT_SECRET`
-     - `RINGCENTRAL_FROM_NUMBER`
-     - `CORS_ORIGIN` (set to your frontend URL, for example `https://<your-frontend>.onrender.com`)
+- The root `package.json` `build` script installs and builds both
+  `apps/medical-note-tool` (Vite) and `apps/api` (Express/TypeScript).
+- The Express server serves the built Vite assets under `/` and handles API
+  requests under `/api`.
+- All non-API requests fall back to `index.html` so client-side routing works.
+- No `CORS_ORIGIN` env var is needed because the frontend and API share the
+  same origin.
 
-If you deploy from the repo root as a single web service, the API startup will fail because this repo is not configured to run as one combined root service.
+### Render service settings
+
+| Setting | Value |
+|---|---|
+| **Environment** | Node |
+| **Root Directory** | *(leave blank — repo root)* |
+| **Build Command** | `npm run build` |
+| **Start Command** | `npm start` |
+
+### Required environment variables
+
+Set these in the Render dashboard under **Environment**:
+
+| Variable | Description |
+|---|---|
+| `RINGCENTRAL_JWT` | RingCentral JWT private-key credential |
+| `RINGCENTRAL_CLIENT_ID` | RingCentral app Client ID |
+| `RINGCENTRAL_CLIENT_SECRET` | RingCentral app Client Secret |
+| `RINGCENTRAL_FROM_NUMBER` | SMS sender number in E.164 format (e.g. `+13055550123`) |
+| `NODE_ENV` | Set to `production` (already set in `render.yaml`) |
+
+### Local development
+
+Start the API server first (from `apps/api`):
+
+```bash
+cd apps/api
+cp .env.example .env   # fill in your RingCentral credentials
+npm install
+npm run dev
+```
+
+Then start the frontend dev server (from `apps/medical-note-tool`):
+
+```bash
+cd apps/medical-note-tool
+npm install
+npm run dev
+```
+
+The Vite dev server proxies `/api` requests to `http://localhost:3001`
+automatically, so SMS sending works without any extra configuration.
+
