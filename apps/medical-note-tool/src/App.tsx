@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from 'react'
-import type { ChangeEvent, FormEvent } from 'react'
+import type { FormEvent } from 'react'
 import './App.css'
 
 type YesNo = '' | 'yes' | 'no'
@@ -63,8 +63,6 @@ const INITIAL_SMS_ROWS: SmsRow[] = [
   { id: 2, date: '2026-05-29', patient: 'James Holloway', account: 'ACC-0891', prescriber: 'Dr. Patel', status: 'Approved', priority: 'Low', phone: '(786) 555-0341' },
   { id: 3, date: '2026-05-30', patient: 'Sandra Kim', account: 'ACC-1107', prescriber: 'Dr. Reyes', status: 'Under Review', priority: 'Medium', phone: '(954) 555-0029' },
 ]
-
-const INITIAL_FILTERS: FilterState = { search: '', status: '', priority: '' }
 
 const MEDICAL_NOTE_TEMPLATE = `The patient {{PATIENT NAME}} is a {{AGE}} year old {{GENDER}} with a PMH of {{PMH}} seeking care for Weight Loss. Body Mass Index is {{BMI}}. Patient {{HAS_WEIGHT_LOSS_PROGRAM}} tried any weight loss programs. The patient {{HAS_GLP1}} tried any GLP1 medications in the past. The patient’s last dose of GLP1 medication or any weight loss related medication generic or non generic is {{LAST DOSE}}
 The patient is interested in GLP-1 RA medications. Denies personal history of type 1 diabetes, pancreatitis, gastroparesis, seizures or glaucoma. Denies personal or family history of Medullary Thyroid Cancer or Multiple Endocrine Neoplasia Type 2.
