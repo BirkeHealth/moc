@@ -8,7 +8,7 @@ This repository deploys as **two Render services**:
    - Root directory: `apps/medical-note-tool`
    - Build command: `yarn && yarn build` (as defined in `render.yaml`)
    - Publish directory: `dist`
-   - Required env var: `VITE_API_URL` (set to your API service URL, for example `https://medical-note-api.onrender.com`)
+   - Required env var: `VITE_API_URL` (set to your API service URL, for example `https://<your-api-service>.onrender.com`)
 
 2. **API (Web Service)**
    - Root directory: `apps/api` (**do not deploy the repository root as the API service**)
@@ -19,6 +19,6 @@ This repository deploys as **two Render services**:
      - `RINGCENTRAL_CLIENT_ID`
      - `RINGCENTRAL_CLIENT_SECRET`
      - `RINGCENTRAL_FROM_NUMBER`
-     - `CORS_ORIGIN` (set to your frontend URL, for example `https://moc-29lo.onrender.com`)
+     - `CORS_ORIGIN` (set to your frontend URL, for example `https://<your-frontend>.onrender.com`)
 
 If you deploy from the repo root as a single web service, the API startup will fail because this repo is not configured to run as one combined root service.
