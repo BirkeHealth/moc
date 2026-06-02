@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from 'react'
-import type { ChangeEvent, FocusEvent, FormEvent } from 'react'
+import type { ChangeEvent, FormEvent } from 'react'
 import './App.css'
 
 type YesNo = '' | 'yes' | 'no'
@@ -78,8 +78,6 @@ const NOTE_PRIORITY_OPTIONS = ['Normal', 'Rush']
 const SMS_STATUS_OPTIONS: SmsStatus[] = ['Received', 'Pending Consultation', 'Approved', 'Cancelled', 'Rejected', 'Incomplete', 'Needs Clarification', 'Missing Forms', 'RTS', 'ScriptSure Error']
 const SMS_PRIORITY_OPTIONS: SmsPriority[] = ['1 - High', '2 - Medium', '3 - Normal']
 const RX_STATUS_OPTIONS = ['Not Received', 'Received', 'Pending', 'Sent']
-const CLINIC_OPTIONS = ['Helimeds', 'Clinic Secret', 'Peaks Curative', 'Doral Acupuncture', 'True Lio', 'Whitecoat MD']
-const VISIT_TYPE_OPTIONS = ['Weightlossfollowup', 'Weightloss', 'Weight Management Follow Up', 'Pain Relief', 'General', 'WomenSexualHealth']
 
 const INITIAL_FORM: FormData = {
   patientName: '',
@@ -481,12 +479,7 @@ function SmsTableTool({ onBackToTools, rows, setRows }: { onBackToTools: () => v
             </div>
             <div className="sms-toolbar-actions">
               <button type="button" className="sms-add-inline" onClick={handleAddEntry}>Add +</button>
-              <input
-                className="sms-search-input"
-                placeholder="Search..."
-                value={filters.search}
-                onChange={(event) => setFilters((current) => ({ ...current, search: event.target.value }))}
-              />
+              <input className="sms-search-input" placeholder="Search..." value={filters.search} onChange={(event) => setFilters((current) => ({ ...current, search: event.target.value }))} />
             </div>
           </div>
 
@@ -514,39 +507,14 @@ function SmsTableTool({ onBackToTools, rows, setRows }: { onBackToTools: () => v
                   <tr key={row.id}>
                     <td><input value={row.dateModified} onChange={handleTextChange(row.id, 'dateModified')} /></td>
                     <td><input value={row.visitId} onChange={handleTextChange(row.id, 'visitId')} /></td>
-                    <td>
-                      <select value={row.status} onChange={handleSelectChange(row.id, 'status')}>
-                        {SMS_STATUS_OPTIONS.map((status) => <option key={status} value={status}>{status}</option>)}
-                      </select>
-                    </td>
+                    <td><select value={row.status} onChange={handleSelectChange(row.id, 'status')}>{SMS_STATUS_OPTIONS.map((status) => <option key={status} value={status}>{status}</option>)}</select></td>
                     <td><input value={row.note} onChange={handleTextChange(row.id, 'note')} /></td>
-                    <td>
-                      <select value={row.rxStatus} onChange={handleSelectChange(row.id, 'rxStatus')}>
-                        {RX_STATUS_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}
-                      </select>
-                    </td>
-                    <td>
-                      <select value={row.priority} onChange={handleSelectChange(row.id, 'priority')}>
-                        {SMS_PRIORITY_OPTIONS.map((priority) => <option key={priority} value={priority}>{priority}</option>)}
-                      </select>
-                    </td>
+                    <td><select value={row.rxStatus} onChange={handleSelectChange(row.id, 'rxStatus')}>{RX_STATUS_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}</select></td>
+                    <td><select value={row.priority} onChange={handleSelectChange(row.id, 'priority')}>{SMS_PRIORITY_OPTIONS.map((priority) => <option key={priority} value={priority}>{priority}</option>)}</select></td>
                     <td><input value={row.visitType} onChange={handleTextChange(row.id, 'visitType')} /></td>
                     <td><input value={row.clinic} onChange={handleTextChange(row.id, 'clinic')} /></td>
-                    <td>
-                      <select value={row.prescriber} onChange={handleSelectChange(row.id, 'prescriber')}>
-                        <option value="None">None</option>
-                        {PRESCRIBER_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}
-                      </select>
-                    </td>
-                    <td>
-                      <input
-                        ref={(node) => {
-                          patientInputRefs.current[row.id] = node
-                        }}
-                        value={row.patient}
-                        onChange={handleTextChange(row.id, 'patient')}
-                      />
-                    </td>
+                    <td><select value={row.prescriber} onChange={handleSelectChange(row.id, 'prescriber')}><option value="None">None</option>{PRESCRIBER_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}</select></td>
+                    <td><input ref={(node) => { patientInputRefs.current[row.id] = node }} value={row.patient} onChange={handleTextChange(row.id, 'patient')} /></td>
                     <td><input type="date" value={row.dateOfBirth} onChange={handleTextChange(row.id, 'dateOfBirth')} /></td>
                     <td><input value={row.phone} onChange={handleTextChange(row.id, 'phone')} /></td>
                     <td><input value={row.state} onChange={handleTextChange(row.id, 'state')} /></td>
