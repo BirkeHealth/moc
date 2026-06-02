@@ -1,6 +1,5 @@
 import { useMemo, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
-import './App.css'
 
 type YesNo = '' | 'yes' | 'no'
 type ToolSelection = 'medical-note' | 'sms-table' | null
@@ -94,20 +93,23 @@ Recommend drinking sufficient water and working on adhering to a balanced diet w
 Will follow up with patient in 3-4 weeks to assess response and side effects.`
 
 const STATUS_STYLES: Record<SmsStatus, string> = {
-  'Pending Consultation': 'sms-status-pill sms-status-pending',
-  'Under Review': 'sms-status-pill sms-status-review',
-  Approved: 'sms-status-pill sms-status-approved',
-  Denied: 'sms-status-pill sms-status-denied',
+  'Pending Consultation': 'border-amber-200 bg-amber-50 text-amber-700',
+  'Under Review': 'border-sky-200 bg-sky-50 text-sky-700',
+  Approved: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+  Denied: 'border-rose-200 bg-rose-50 text-rose-700',
 }
 
-const PRIORITY_DOT: Record<SmsPriority, string> = {
-  High: 'sms-priority-dot sms-priority-high',
-  Medium: 'sms-priority-dot sms-priority-medium',
-  Low: 'sms-priority-dot sms-priority-low',
+const PRIORITY_STYLES: Record<SmsPriority, string> = {
+  High: 'border-rose-200 bg-rose-50 text-rose-700',
+  Medium: 'border-amber-200 bg-amber-50 text-amber-700',
+  Low: 'border-emerald-200 bg-emerald-50 text-emerald-700',
 }
 
 const MISSING_VALUE = '—'
 const TEMPORARY_ACCESS_CODE = 'MOC0813'
+const fieldClassName = 'w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm outline-none transition focus:border-sky-400 focus:ring-2 focus:ring-sky-100'
+const buttonPrimaryClassName = 'inline-flex items-center justify-center rounded-md border border-sky-700 bg-sky-700 px-3 py-2 text-sm font-medium text-white transition hover:bg-sky-800'
+const buttonSecondaryClassName = 'inline-flex items-center justify-center rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50'
 
 const formatToday = () => new Date().toISOString().slice(0, 10)
 const formatAccountCode = (value: string) => {
@@ -193,34 +195,76 @@ function MedicalNoteTool({ onBackToTools, onAddSmsRow }: { onBackToTools: () => 
   }
 
   return (
-    <main className="app">
-      <div className="app-header"><button type="button" className="secondary" onClick={onBackToTools}>Back to tools</button></div>
-      <h1>Medical Note Template Tool</h1>
-      <p className="privacy">All processing stays in your browser. No data is saved or transmitted.</p>
-      <div className="layout">
-        <form className="form" onSubmit={(event) => event.preventDefault()}>
-          <label>Patient Name<input value={formData.patientName} onChange={(event) => updateField('patientName', event.target.value)} /></label>
-          <label>Date of Birth<input type="date" value={formData.dob} onChange={(event) => updateField('dob', event.target.value)} /></label>
-          <label>Phone Number<input value={formData.phone} onChange={(event) => updateField('phone', event.target.value)} /></label>
-          <fieldset><legend>Gender</legend><label className="inline"><input type="radio" name="gender" checked={formData.gender === 'Male'} onChange={() => updateField('gender', 'Male')} />Male</label><label className="inline"><input type="radio" name="gender" checked={formData.gender === 'Female'} onChange={() => updateField('gender', 'Female')} />Female</label></fieldset>
-          <div className="inline-grid"><label>Height (ft)<input type="number" min="0" value={formData.heightFt} onChange={(event) => updateField('heightFt', event.target.value)} /></label><label>Height (in)<input type="number" min="0" value={formData.heightIn} onChange={(event) => updateField('heightIn', event.target.value)} /></label></div>
-          <label>Weight (lbs)<input type="number" min="0" value={formData.weight} onChange={(event) => updateField('weight', event.target.value)} /></label>
-          <label>BMI<input value={formData.bmi} onChange={(event) => updateField('bmi', event.target.value)} /></label>
-          <label>Allergies<textarea value={formData.allergies} onChange={(event) => updateField('allergies', event.target.value)} /></label>
-          <label>Past Medical History (PMH)<textarea value={formData.pmh} onChange={(event) => updateField('pmh', event.target.value)} /></label>
-          <label>Past Surgical History (PSH)<textarea value={formData.psh} onChange={(event) => updateField('psh', event.target.value)} /></label>
-          <label>Current Medications<textarea value={formData.medications} onChange={(event) => updateField('medications', event.target.value)} /></label>
-          <fieldset><legend>Previous Weight Loss Programs</legend><label className="inline"><input type="radio" name="weight-loss" checked={formData.hasWeightLossProgram === 'yes'} onChange={() => updateField('hasWeightLossProgram', 'yes')} />Yes</label><label className="inline"><input type="radio" name="weight-loss" checked={formData.hasWeightLossProgram === 'no'} onChange={() => updateField('hasWeightLossProgram', 'no')} />No</label></fieldset>
-          <fieldset><legend>Previous GLP-1 Medication Use</legend><label className="inline"><input type="radio" name="glp1" checked={formData.hasGlp1 === 'yes'} onChange={() => updateField('hasGlp1', 'yes')} />Yes</label><label className="inline"><input type="radio" name="glp1" checked={formData.hasGlp1 === 'no'} onChange={() => updateField('hasGlp1', 'no')} />No</label></fieldset>
-          <label>Last Dose of GLP-1 or Weight-Loss Medication<input value={formData.lastDose} onChange={(event) => updateField('lastDose', event.target.value)} /></label>
-          <label>Account / Client<select value={formData.account} onChange={(event) => updateField('account', event.target.value)}><option value="">Select an account</option>{ACCOUNT_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}</select></label>
-          <label>Prescriber<select value={formData.prescriber} onChange={(event) => updateField('prescriber', event.target.value)}><option value="">Select a prescriber</option>{PRESCRIBER_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}</select></label>
-          <label>Medication Being Prescribed<select value={formData.prescribedMedication} onChange={(event) => updateField('prescribedMedication', event.target.value)}><option value="">Select medication</option>{MEDICATION_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}</select></label>
-          <label>Priority<select value={formData.priority} onChange={(event) => updateField('priority', event.target.value)}>{NOTE_PRIORITY_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}</select></label>
-          <div className="button-row"><button type="button" onClick={handleCopy}>Copy Note</button><button type="button" onClick={handleSmsAndCopy}>SMS & Copy</button></div>
-          {copyFeedback && <p className="feedback">{copyFeedback}</p>}
+    <main className="mx-auto min-h-screen w-full max-w-[1400px] px-3 py-4 sm:px-4">
+      <div className="mb-3 flex justify-end">
+        <button type="button" className={buttonSecondaryClassName} onClick={onBackToTools}>Back to tools</button>
+      </div>
+      <h1 className="text-2xl font-semibold text-slate-900 sm:text-3xl">Medical Note Template Tool</h1>
+      <p className="mt-1 text-sm text-slate-600">All processing stays in your browser. No data is saved or transmitted.</p>
+      <div className="mt-4 grid gap-4 xl:grid-cols-[minmax(340px,1fr)_minmax(380px,1fr)]">
+        <form className="grid gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm" onSubmit={(event) => event.preventDefault()}>
+          <label className="grid gap-1 text-sm text-slate-700">Patient Name<input className={fieldClassName} value={formData.patientName} onChange={(event) => updateField('patientName', event.target.value)} /></label>
+          <label className="grid gap-1 text-sm text-slate-700">Date of Birth<input type="date" className={fieldClassName} value={formData.dob} onChange={(event) => updateField('dob', event.target.value)} /></label>
+          <label className="grid gap-1 text-sm text-slate-700">Phone Number<input className={fieldClassName} value={formData.phone} onChange={(event) => updateField('phone', event.target.value)} /></label>
+          <fieldset className="grid gap-2 rounded-md border border-slate-200 p-3">
+            <legend className="px-1 text-xs font-medium text-slate-600">Gender</legend>
+            <label className="inline-flex items-center gap-2 text-sm text-slate-700"><input type="radio" name="gender" checked={formData.gender === 'Male'} onChange={() => updateField('gender', 'Male')} />Male</label>
+            <label className="inline-flex items-center gap-2 text-sm text-slate-700"><input type="radio" name="gender" checked={formData.gender === 'Female'} onChange={() => updateField('gender', 'Female')} />Female</label>
+          </fieldset>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <label className="grid gap-1 text-sm text-slate-700">Height (ft)<input type="number" min="0" className={fieldClassName} value={formData.heightFt} onChange={(event) => updateField('heightFt', event.target.value)} /></label>
+            <label className="grid gap-1 text-sm text-slate-700">Height (in)<input type="number" min="0" className={fieldClassName} value={formData.heightIn} onChange={(event) => updateField('heightIn', event.target.value)} /></label>
+          </div>
+          <label className="grid gap-1 text-sm text-slate-700">Weight (lbs)<input type="number" min="0" className={fieldClassName} value={formData.weight} onChange={(event) => updateField('weight', event.target.value)} /></label>
+          <label className="grid gap-1 text-sm text-slate-700">BMI<input className={fieldClassName} value={formData.bmi} onChange={(event) => updateField('bmi', event.target.value)} /></label>
+          <label className="grid gap-1 text-sm text-slate-700">Allergies<textarea className={fieldClassName} value={formData.allergies} onChange={(event) => updateField('allergies', event.target.value)} /></label>
+          <label className="grid gap-1 text-sm text-slate-700">Past Medical History (PMH)<textarea className={fieldClassName} value={formData.pmh} onChange={(event) => updateField('pmh', event.target.value)} /></label>
+          <label className="grid gap-1 text-sm text-slate-700">Past Surgical History (PSH)<textarea className={fieldClassName} value={formData.psh} onChange={(event) => updateField('psh', event.target.value)} /></label>
+          <label className="grid gap-1 text-sm text-slate-700">Current Medications<textarea className={fieldClassName} value={formData.medications} onChange={(event) => updateField('medications', event.target.value)} /></label>
+          <fieldset className="grid gap-2 rounded-md border border-slate-200 p-3">
+            <legend className="px-1 text-xs font-medium text-slate-600">Previous Weight Loss Programs</legend>
+            <label className="inline-flex items-center gap-2 text-sm text-slate-700"><input type="radio" name="weight-loss" checked={formData.hasWeightLossProgram === 'yes'} onChange={() => updateField('hasWeightLossProgram', 'yes')} />Yes</label>
+            <label className="inline-flex items-center gap-2 text-sm text-slate-700"><input type="radio" name="weight-loss" checked={formData.hasWeightLossProgram === 'no'} onChange={() => updateField('hasWeightLossProgram', 'no')} />No</label>
+          </fieldset>
+          <fieldset className="grid gap-2 rounded-md border border-slate-200 p-3">
+            <legend className="px-1 text-xs font-medium text-slate-600">Previous GLP-1 Medication Use</legend>
+            <label className="inline-flex items-center gap-2 text-sm text-slate-700"><input type="radio" name="glp1" checked={formData.hasGlp1 === 'yes'} onChange={() => updateField('hasGlp1', 'yes')} />Yes</label>
+            <label className="inline-flex items-center gap-2 text-sm text-slate-700"><input type="radio" name="glp1" checked={formData.hasGlp1 === 'no'} onChange={() => updateField('hasGlp1', 'no')} />No</label>
+          </fieldset>
+          <label className="grid gap-1 text-sm text-slate-700">Last Dose of GLP-1 or Weight-Loss Medication<input className={fieldClassName} value={formData.lastDose} onChange={(event) => updateField('lastDose', event.target.value)} /></label>
+          <label className="grid gap-1 text-sm text-slate-700">Account / Client
+            <select className={fieldClassName} value={formData.account} onChange={(event) => updateField('account', event.target.value)}>
+              <option value="">Select an account</option>
+              {ACCOUNT_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}
+            </select>
+          </label>
+          <label className="grid gap-1 text-sm text-slate-700">Prescriber
+            <select className={fieldClassName} value={formData.prescriber} onChange={(event) => updateField('prescriber', event.target.value)}>
+              <option value="">Select a prescriber</option>
+              {PRESCRIBER_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}
+            </select>
+          </label>
+          <label className="grid gap-1 text-sm text-slate-700">Medication Being Prescribed
+            <select className={fieldClassName} value={formData.prescribedMedication} onChange={(event) => updateField('prescribedMedication', event.target.value)}>
+              <option value="">Select medication</option>
+              {MEDICATION_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}
+            </select>
+          </label>
+          <label className="grid gap-1 text-sm text-slate-700">Priority
+            <select className={fieldClassName} value={formData.priority} onChange={(event) => updateField('priority', event.target.value)}>
+              {NOTE_PRIORITY_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}
+            </select>
+          </label>
+          <div className="flex flex-wrap gap-3">
+            <button type="button" className={buttonPrimaryClassName} onClick={handleCopy}>Copy Note</button>
+            <button type="button" className={buttonPrimaryClassName} onClick={handleSmsAndCopy}>SMS & Copy</button>
+          </div>
+          {copyFeedback && <p className="text-sm text-slate-600">{copyFeedback}</p>}
         </form>
-        <section className="preview"><h2>Live Preview</h2><pre>{noteText}</pre></section>
+        <section className="grid grid-rows-[auto_minmax(0,1fr)] rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+          <h2 className="mb-2 text-lg font-semibold text-slate-900">Live Preview</h2>
+          <pre className="m-0 overflow-auto rounded-md border border-slate-200 bg-slate-50 p-3 font-mono text-xs leading-relaxed text-slate-700 whitespace-pre-wrap">{noteText}</pre>
+        </section>
       </div>
     </main>
   )
@@ -263,77 +307,74 @@ function SmsTableTool({ onBackToTools, rows, setRows }: { onBackToTools: () => v
   }
 
   return (
-    <main className="app sms-table-shell-clean">
-      <div className="sms-table-clean-wrap">
-        <div className="sms-table-header-clean">
+    <main className="mx-auto min-h-screen w-full max-w-[1200px] px-3 py-4 sm:px-4">
+      <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h1>SMS table</h1>
-            <p>Track and manage SMS workflow details</p>
+            <h1 className="text-2xl font-semibold text-slate-900 sm:text-[28px]">SMS table</h1>
+            <p className="mt-1 text-sm text-slate-600">Track and manage SMS workflow details</p>
           </div>
-          <div className="sms-table-header-actions">
-            <button type="button" className="secondary" onClick={onBackToTools}>Back to tools</button>
-            <button type="button" className="sms-add-entry-btn" onClick={addRow}>+ Add entry</button>
+          <div className="flex flex-wrap items-center gap-2">
+            <button type="button" className={buttonSecondaryClassName} onClick={onBackToTools}>Back to tools</button>
+            <button type="button" className={buttonPrimaryClassName} onClick={addRow}>+ Add entry</button>
           </div>
         </div>
 
-        <div className="sms-stat-grid-clean">
+        <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
           {[{ label: 'Total', value: stats.total }, { label: 'Pending', value: stats.pending }, { label: 'Approved', value: stats.approved }, { label: 'High priority', value: stats.high }].map((item) => (
-            <div key={item.label} className="sms-stat-card-clean">
-              <div className="sms-stat-label-clean">{item.label}</div>
-              <div className="sms-stat-value-clean">{item.value}</div>
+            <div key={item.label} className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+              <p className="text-xs font-medium uppercase tracking-wide text-slate-500">{item.label}</p>
+              <p className="mt-1 text-xl font-semibold text-slate-900">{item.value}</p>
             </div>
           ))}
         </div>
 
-        <div className="sms-filter-row-clean">
-          <input type="text" placeholder="Search patient or prescriber…" value={search} onChange={(event) => setSearch(event.target.value)} className="sms-filter-input-clean sms-filter-search-clean" />
-          <select value={filterStatus} onChange={(event) => setFilterStatus(event.target.value as SmsStatus | '')} className="sms-filter-input-clean">
+        <div className="mt-4 flex flex-wrap items-center gap-2">
+          <select value={filterStatus} onChange={(event) => setFilterStatus(event.target.value as SmsStatus | '')} className={`${fieldClassName} w-full sm:w-[180px]`}>
             <option value="">All statuses</option>
             {STATUSES.map((status) => <option key={status}>{status}</option>)}
           </select>
-          <select value={filterPriority} onChange={(event) => setFilterPriority(event.target.value as SmsPriority | '')} className="sms-filter-input-clean">
+          <select value={filterPriority} onChange={(event) => setFilterPriority(event.target.value as SmsPriority | '')} className={`${fieldClassName} w-full sm:w-[160px]`}>
             <option value="">All priorities</option>
             {PRIORITIES.map((priority) => <option key={priority}>{priority}</option>)}
           </select>
+          <input type="text" placeholder="Search patient or prescriber…" value={search} onChange={(event) => setSearch(event.target.value)} className={`${fieldClassName} w-full sm:ml-auto sm:max-w-xs`} />
         </div>
 
-        <div className="sms-table-card-clean">
-          <table className="sms-table-clean">
-            <thead>
+        <div className="mt-4 overflow-hidden rounded-lg border border-slate-200">
+          <table className="w-full table-fixed text-left text-xs text-slate-700">
+            <thead className="bg-slate-50 text-[11px] uppercase tracking-wide text-slate-500">
               <tr>
                 {['Date', 'Patient name', 'Client account', 'Prescriber', 'Status', 'Priority', 'Phone number', ''].map((heading) => (
-                  <th key={heading}>{heading}</th>
+                  <th key={heading} className="px-2 py-2 font-semibold">{heading}</th>
                 ))}
               </tr>
             </thead>
-            <tbody>
+            <tbody className="divide-y divide-slate-100 bg-white">
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="sms-empty-clean">No entries — click “Add entry” to start</td>
+                  <td colSpan={8} className="px-4 py-6 text-center text-sm text-slate-500">No entries — click “Add entry” to start</td>
                 </tr>
               ) : (
                 filtered.map((row) => (
                   <tr key={row.id}>
-                    <td><input type="date" value={row.date} onChange={(event) => updateRow(row.id, 'date', event.target.value)} className="sms-cell-input-clean" /></td>
-                    <td><input type="text" value={row.patient} placeholder="Patient name" onChange={(event) => updateRow(row.id, 'patient', event.target.value)} className="sms-cell-input-clean" /></td>
-                    <td><input type="text" value={row.account} placeholder="ACC-####" onChange={(event) => updateRow(row.id, 'account', event.target.value)} className="sms-cell-input-clean" /></td>
-                    <td><input type="text" value={row.prescriber} placeholder="Dr. Name" onChange={(event) => updateRow(row.id, 'prescriber', event.target.value)} className="sms-cell-input-clean" /></td>
-                    <td>
-                      <select value={row.status} onChange={(event) => updateRow(row.id, 'status', event.target.value as SmsStatus)} className={STATUS_STYLES[row.status]}>
+                    <td className="px-2 py-2 align-top"><input type="date" value={row.date} onChange={(event) => updateRow(row.id, 'date', event.target.value)} className="w-full min-w-0 rounded-md border border-slate-200 px-2 py-1.5 text-[11px]" /></td>
+                    <td className="px-2 py-2 align-top"><input type="text" value={row.patient} placeholder="Patient name" onChange={(event) => updateRow(row.id, 'patient', event.target.value)} className="w-full min-w-0 rounded-md border border-slate-200 px-2 py-1.5 text-[11px]" /></td>
+                    <td className="px-2 py-2 align-top"><input type="text" value={row.account} placeholder="ACC-####" onChange={(event) => updateRow(row.id, 'account', event.target.value)} className="w-full min-w-0 rounded-md border border-slate-200 px-2 py-1.5 text-[11px]" /></td>
+                    <td className="px-2 py-2 align-top"><input type="text" value={row.prescriber} placeholder="Dr. Name" onChange={(event) => updateRow(row.id, 'prescriber', event.target.value)} className="w-full min-w-0 rounded-md border border-slate-200 px-2 py-1.5 text-[11px]" /></td>
+                    <td className="px-2 py-2 align-top">
+                      <select value={row.status} onChange={(event) => updateRow(row.id, 'status', event.target.value as SmsStatus)} className={`w-full min-w-0 rounded-md border px-2 py-1.5 text-[11px] font-medium ${STATUS_STYLES[row.status]}`}>
                         {STATUSES.map((status) => <option key={status}>{status}</option>)}
                       </select>
                     </td>
-                    <td>
-                      <div className="sms-priority-cell-clean">
-                        <span className={PRIORITY_DOT[row.priority]} />
-                        <select value={row.priority} onChange={(event) => updateRow(row.id, 'priority', event.target.value as SmsPriority)} className="sms-priority-select-clean">
-                          {PRIORITIES.map((priority) => <option key={priority}>{priority}</option>)}
-                        </select>
-                      </div>
+                    <td className="px-2 py-2 align-top">
+                      <select value={row.priority} onChange={(event) => updateRow(row.id, 'priority', event.target.value as SmsPriority)} className={`w-full min-w-0 rounded-md border px-2 py-1.5 text-[11px] font-medium ${PRIORITY_STYLES[row.priority]}`}>
+                        {PRIORITIES.map((priority) => <option key={priority}>{priority}</option>)}
+                      </select>
                     </td>
-                    <td><input type="tel" value={row.phone} placeholder="(000) 000-0000" onChange={(event) => updateRow(row.id, 'phone', event.target.value)} className="sms-cell-input-clean" /></td>
-                    <td>
-                      <button type="button" aria-label="Delete row" className="sms-delete-row-clean" onClick={() => deleteRow(row.id)}>
+                    <td className="px-2 py-2 align-top"><input type="tel" value={row.phone} placeholder="(000) 000-0000" onChange={(event) => updateRow(row.id, 'phone', event.target.value)} className="w-full min-w-0 rounded-md border border-slate-200 px-2 py-1.5 text-[11px]" /></td>
+                    <td className="px-2 py-2 text-right align-top">
+                      <button type="button" aria-label="Delete row" className="inline-flex rounded-md border border-slate-200 p-1 text-slate-500 hover:bg-slate-50" onClick={() => deleteRow(row.id)}>
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14H6L5 6" /><path d="M10 11v6" /><path d="M14 11v6" /><path d="M9 6V4h6v2" /></svg>
                       </button>
                     </td>
@@ -343,7 +384,16 @@ function SmsTableTool({ onBackToTools, rows, setRows }: { onBackToTools: () => v
             </tbody>
           </table>
         </div>
-      </div>
+
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500">
+          <span>Showing {filtered.length} of {rows.length} entries</span>
+          <div className="inline-flex items-center gap-1">
+            <button type="button" className="rounded-md border border-slate-200 px-2 py-1 text-slate-500" disabled>Previous</button>
+            <span className="rounded-md border border-slate-200 px-2 py-1 text-slate-600">1</span>
+            <button type="button" className="rounded-md border border-slate-200 px-2 py-1 text-slate-500" disabled>Next</button>
+          </div>
+        </div>
+      </section>
     </main>
   )
 }
@@ -366,11 +416,34 @@ function App() {
   }
 
   if (!isAccessGranted) {
-    return <main className="app gate-page"><section className="gate-card"><h1>BirkeHealth Tools</h1><p className="privacy">Enter the access code to continue. This gate is client-side only and should not be treated as secure authentication.</p><form onSubmit={handleAccessSubmit} className="gate-form"><label>Access Code<input value={accessCode} onChange={(event) => { setAccessError(''); setAccessCode(event.target.value) }} /></label><button type="submit">Continue</button></form>{accessError && <p className="feedback">{accessError}</p>}</section></main>
+    return (
+      <main className="grid min-h-screen place-items-center px-3 py-6">
+        <section className="w-full max-w-md rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+          <h1 className="text-2xl font-semibold text-slate-900">BirkeHealth Tools</h1>
+          <p className="mt-1 text-sm text-slate-600">Enter the access code to continue. This gate is client-side only and should not be treated as secure authentication.</p>
+          <form onSubmit={handleAccessSubmit} className="mt-4 grid gap-3">
+            <label className="grid gap-1 text-sm text-slate-700">Access Code<input className={fieldClassName} value={accessCode} onChange={(event) => { setAccessError(''); setAccessCode(event.target.value) }} /></label>
+            <button type="submit" className={buttonPrimaryClassName}>Continue</button>
+          </form>
+          {accessError && <p className="mt-3 text-sm text-slate-600">{accessError}</p>}
+        </section>
+      </main>
+    )
   }
 
   if (selectedTool === null) {
-    return <main className="app gate-page"><section className="gate-card"><h1>Select a Tool</h1><p className="privacy">Choose a tool to open.</p><div className="tool-list"><button type="button" onClick={() => setSelectedTool('medical-note')}>Medical Note</button><button type="button" onClick={() => setSelectedTool('sms-table')}>SMS TABLE</button></div></section></main>
+    return (
+      <main className="grid min-h-screen place-items-center px-3 py-6">
+        <section className="w-full max-w-md rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+          <h1 className="text-2xl font-semibold text-slate-900">Select a Tool</h1>
+          <p className="mt-1 text-sm text-slate-600">Choose a tool to open.</p>
+          <div className="mt-4 grid gap-2">
+            <button type="button" className={buttonPrimaryClassName} onClick={() => setSelectedTool('medical-note')}>Medical Note</button>
+            <button type="button" className={buttonSecondaryClassName} onClick={() => setSelectedTool('sms-table')}>SMS TABLE</button>
+          </div>
+        </section>
+      </main>
+    )
   }
 
   if (selectedTool === 'medical-note') {
