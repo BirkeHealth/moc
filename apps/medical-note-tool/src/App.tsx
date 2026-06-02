@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 
 type YesNo = '' | 'yes' | 'no'
@@ -121,9 +121,13 @@ const PRIORITY_STYLES: Record<SmsPriority, string> = {
 
 const MISSING_VALUE = '—'
 const TEMPORARY_ACCESS_CODE = 'MOC0813'
-const RINGCENTRAL_API_URL = 'https://platform.ringcentral.com'
-const SMS_TOKEN_STORAGE_KEY = 'medical-note-tool:smsToken'
-const SMS_FROM_NUMBER_STORAGE_KEY = 'medical-note-tool:fromNumber'
+// SMS requests are forwarded to the server-side API which handles
+// RingCentral JWT auth and stores the sender credentials as env variables.
+// VITE_API_URL must be set at build time for production deployments where the
+// API lives on a different origin (e.g. https://medical-note-api.onrender.com).
+// In development the Vite proxy rewrites /api to localhost:3001 automatically.
+const API_URL_PREFIX: string = (import.meta.env.VITE_API_URL as string | undefined) ?? ''
+const SMS_API_URL = `${API_URL_PREFIX}/api/sms`
 const fieldClassName = 'w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm outline-none transition focus:border-sky-400 focus:ring-2 focus:ring-sky-100'
 const buttonPrimaryClassName = 'inline-flex items-center justify-center rounded-md border border-sky-700 bg-sky-700 px-3 py-2 text-sm font-medium text-white transition hover:bg-sky-800'
 const buttonSecondaryClassName = 'inline-flex items-center justify-center rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50'
@@ -139,14 +143,6 @@ const formatAccountCode = (value: string) => {
   return digits ? `ACC-${digits}` : ''
 }
 const mapNotePriorityToSmsPriority = (value: string): SmsPriority => (value === 'Rush' ? 'High' : 'Medium')
-const getStoredValue = (key: string) => {
-  if (typeof window === 'undefined') return ''
-  try {
-    return window.localStorage.getItem(key) ?? ''
-  } catch {
-    return ''
-  }
-}
 const normalizePhoneNumber = (raw: string) => {
   if (!raw.trim()) return ''
   const normalized = raw.trim().replace(/[^\d+]/g, '')
@@ -372,39 +368,10 @@ function SmsTableTool({ onBackToTools, rows, setRows }: { onBackToTools: () => v
   const [search, setSearch] = useState('')
   const [filterStatus, setFilterStatus] = useState<SmsStatus | ''>('')
   const [filterPriority, setFilterPriority] = useState<SmsPriority | ''>('')
-  const [smsToken, setSmsToken] = useState(() => getStoredValue(SMS_TOKEN_STORAGE_KEY))
-  const [showSmsToken, setShowSmsToken] = useState(false)
-  const [fromNumber, setFromNumber] = useState(() => getStoredValue(SMS_FROM_NUMBER_STORAGE_KEY))
   const [smsFeedback, setSmsFeedback] = useState('')
   const [isSending, setIsSending] = useState(false)
   const [selectedSendAction, setSelectedSendAction] = useState('')
   const nextIdRef = useRef(Math.max(0, ...rows.map((row) => row.id)) + 1)
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return
-    try {
-      if (smsToken) {
-        window.localStorage.setItem(SMS_TOKEN_STORAGE_KEY, smsToken)
-      } else {
-        window.localStorage.removeItem(SMS_TOKEN_STORAGE_KEY)
-      }
-    } catch {
-      // Ignore localStorage errors
-    }
-  }, [smsToken])
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return
-    try {
-      if (fromNumber) {
-        window.localStorage.setItem(SMS_FROM_NUMBER_STORAGE_KEY, fromNumber)
-      } else {
-        window.localStorage.removeItem(SMS_FROM_NUMBER_STORAGE_KEY)
-      }
-    } catch {
-      // Ignore localStorage errors
-    }
-  }, [fromNumber])
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase()
@@ -436,63 +403,29 @@ function SmsTableTool({ onBackToTools, rows, setRows }: { onBackToTools: () => v
     setRows((prev) => prev.filter((row) => row.id !== id))
   }
 
-  const hasValidSmsCredentials = () => {
-    const hasToken = Boolean(smsToken.trim())
-    const hasFromNumber = Boolean(normalizePhoneNumber(fromNumber))
-    const isValid = hasToken && hasFromNumber
-    if (!isValid) {
-      if (!hasToken && !hasFromNumber) {
-        setSmsFeedback('Enter a RingCentral access token and a valid +1 from number before sending.')
-      } else if (!hasToken) {
-        setSmsFeedback('Enter a RingCentral access token before sending.')
-      } else {
-        setSmsFeedback('Enter a valid +1 from number before sending.')
-      }
-    }
-    return isValid
-  }
-
-  const sendSms = async (to: string, text: string) => {
-    const normalizedFrom = normalizePhoneNumber(fromNumber)
-    const normalizedToken = smsToken.trim()
-    if (!normalizedToken || !normalizedFrom) {
-      return { ok: false, error: 'Missing RingCentral credentials. Enter a current token and a valid +1 from number.' } satisfies SmsSendResult
-    }
+  const sendSms = async (to: string, text: string): Promise<SmsSendResult> => {
     try {
-      const response = await fetch(`${RINGCENTRAL_API_URL}/restapi/v1.0/account/~/extension/~/sms`, {
+      const response = await fetch(SMS_API_URL, {
         method: 'POST',
-        headers: {
-          Authorization: 'Bearer ' + normalizedToken,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          from: { phoneNumber: normalizedFrom },
-          to: [{ phoneNumber: to }],
-          text,
-        }),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ to, text }),
       })
       if (response.ok) return { ok: true } satisfies SmsSendResult
 
-      const detail = getSmsApiErrorDetail(await response.text())
-      if (response.status === 401) {
-        return {
-          ok: false,
-          error: `Invalid RingCentral credentials. Confirm the access token is current.${detail ? ` ${detail}` : ''}`,
-        } satisfies SmsSendResult
-      }
-      if (response.status === 403) {
-        return {
-          ok: false,
-          error: `RingCentral denied permission to send from this number or extension. Confirm the from number is enabled for the current account.${detail ? ` ${detail}` : ''}`,
-        } satisfies SmsSendResult
+      const data = (await response.json().catch(() => ({}))) as { error?: string; detail?: string }
+      const detail = data.detail ? getSmsApiErrorDetail(data.detail) : ''
+      const errorMessage = data.error ?? `SMS request failed (${response.status})`
+
+      if (response.status === 500) {
+        return { ok: false, error: 'SMS service error. Contact the administrator.' } satisfies SmsSendResult
       }
       return {
         ok: false,
-        error: `RingCentral rejected the message (${response.status}${response.statusText ? ` ${response.statusText}` : ''}).${detail ? ` ${detail}` : ''}`,
+        error: `${errorMessage}${detail ? ` ${detail}` : ''}`,
       } satisfies SmsSendResult
     } catch {
-      console.error('RingCentral SMS send failed')
-      return { ok: false, error: 'Unable to reach RingCentral. Check your connection and try again.' } satisfies SmsSendResult
+      console.error('SMS API request failed')
+      return { ok: false, error: 'Unable to reach the SMS service. Check your connection and try again.' } satisfies SmsSendResult
     }
   }
 
@@ -509,7 +442,6 @@ function SmsTableTool({ onBackToTools, rows, setRows }: { onBackToTools: () => v
     emptyMessage: string
     buildMessage: (row: SmsRow) => string
   }) => {
-    if (!hasValidSmsCredentials()) return
     const eligibleRows = rows.filter((row) => row.status === eligibleStatus)
     if (eligibleRows.length === 0) {
       setSmsFeedback(emptyMessage)
@@ -602,29 +534,7 @@ function SmsTableTool({ onBackToTools, rows, setRows }: { onBackToTools: () => v
           <input type="text" placeholder="Search patient or prescriber…" value={search} onChange={(event) => setSearch(event.target.value)} className={`${fieldClassName} w-full sm:ml-auto sm:max-w-xs`} />
         </div>
 
-        <div className="mt-3 grid gap-2 lg:grid-cols-[minmax(220px,1fr)_minmax(200px,220px)_minmax(220px,240px)]">
-          <div className="flex gap-2">
-            <input
-              type={showSmsToken ? 'text' : 'password'}
-              placeholder="RingCentral access token"
-              value={smsToken}
-              onChange={(event) => setSmsToken(event.target.value)}
-              autoComplete="new-password"
-              spellCheck={false}
-              data-form-type="other"
-              className={fieldClassName}
-            />
-            <button type="button" className={buttonSecondaryClassName} onClick={() => setShowSmsToken((current) => !current)}>
-              {showSmsToken ? 'Hide' : 'Show'}
-            </button>
-          </div>
-          <input
-            type="tel"
-            placeholder="From number (+1##########)"
-            value={fromNumber}
-            onChange={(event) => setFromNumber(event.target.value)}
-            className={fieldClassName}
-          />
+        <div className="mt-3 flex flex-wrap items-center gap-2">
           <select
             value={selectedSendAction}
             onChange={async (event) => {
@@ -642,7 +552,7 @@ function SmsTableTool({ onBackToTools, rows, setRows }: { onBackToTools: () => v
                 setSelectedSendAction('')
               }
             }}
-            className={fieldClassName}
+            className={`${fieldClassName} w-full sm:w-[260px]`}
             disabled={isSending}
           >
             <option value="">Send Action</option>
@@ -650,7 +560,6 @@ function SmsTableTool({ onBackToTools, rows, setRows }: { onBackToTools: () => v
             <option value="follow-up">2nd Text Follow-up</option>
           </select>
         </div>
-        <p className="mt-2 text-xs text-slate-500">Token and from number are saved locally in this browser and auto-filled on reload.</p>
         {smsFeedback && <p className="mt-2 text-sm text-slate-600" role="status" aria-live="polite">{smsFeedback}</p>}
 
         <div className="mt-4 overflow-x-auto overflow-y-hidden rounded-lg border border-slate-200">
