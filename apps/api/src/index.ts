@@ -1,5 +1,11 @@
 import express from 'express'
 import cors from 'cors'
+import { fileURLToPath } from 'url'
+import path from 'path'
+import fs from 'fs'
+
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
 
 // ---------------------------------------------------------------------------
 // Configuration — all sourced from environment variables.
@@ -99,7 +105,11 @@ if (CORS_ORIGIN) {
     }),
   )
 } else {
-  console.warn('CORS is disabled because CORS_ORIGIN is not set')
+  // In same-origin (single-service) production deployments CORS_ORIGIN is not
+  // needed because the frontend is served by this same process.
+  if (process.env.NODE_ENV !== 'production') {
+    console.warn('CORS is disabled because CORS_ORIGIN is not set')
+  }
 }
 app.use(express.json())
 
@@ -194,6 +204,33 @@ app.post('/api/sms', async (req, res) => {
     detail: errorBody,
   })
 })
+
+// ---------------------------------------------------------------------------
+// Static file serving + SPA fallback (production single-service deployment)
+// In production the built frontend lives at apps/medical-note-tool/dist
+// relative to the repo root. The compiled API file is at
+// apps/api/dist/index.js, so two levels up is the repo root.
+// Override with FRONTEND_DIST env var if the layout differs.
+// ---------------------------------------------------------------------------
+if (process.env.NODE_ENV === 'production') {
+  const frontendDist = process.env.FRONTEND_DIST ?? path.join(__dirname, '../../medical-note-tool/dist')
+  const frontendIndexFile = path.join(frontendDist, 'index.html')
+  let frontendIndexHtml: string
+  try {
+    frontendIndexHtml = fs.readFileSync(frontendIndexFile, 'utf8')
+  } catch (error) {
+    throw new Error(
+      `Unable to read frontend index file at ${frontendIndexFile}. Build the frontend first or set FRONTEND_DIST to the correct directory.`,
+      { cause: error },
+    )
+  }
+  app.use(express.static(frontendDist))
+  // SPA fallback: serve index.html for any non-API route so client-side
+  // routing works correctly.
+  app.get('*', (_req, res) => {
+    res.type('html').send(frontendIndexHtml)
+  })
+}
 
 // ---------------------------------------------------------------------------
 // Start
