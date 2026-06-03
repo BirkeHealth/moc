@@ -513,7 +513,8 @@ app.post('/api/sms-check-replies', smsRowsRateLimit, async (_req, res) => {
     }
 
     allMessages.push(...(json.records ?? []))
-    pageUrl = json.navigation?.nextPage?.uri ? RINGCENTRAL_BASE_URL + json.navigation.nextPage.uri : null
+    const nextUri = json.navigation?.nextPage?.uri
+    pageUrl = nextUri ? (nextUri.startsWith('http') ? nextUri : RINGCENTRAL_BASE_URL + nextUri) : null
   }
 
   // Build a set of normalized phone numbers that replied "yes"
