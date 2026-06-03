@@ -72,7 +72,7 @@ const dbPool = DATABASE_URL
 
 const isSmsStatus = (value: unknown): value is SmsStatus => typeof value === 'string' && SMS_STATUSES.includes(value as SmsStatus)
 const isSmsPriority = (value: unknown): value is SmsPriority => typeof value === 'string' && SMS_PRIORITIES.includes(value as SmsPriority)
-const isNonEmptyString = (value: unknown): value is string => typeof value === 'string'
+const isNonEmptyString = (value: unknown): value is string => typeof value === 'string' && value.trim().length > 0
 const isIsoDateString = (value: unknown): value is string => typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)
 
 const parseSmsRow = (body: unknown): SmsRow | null => {
