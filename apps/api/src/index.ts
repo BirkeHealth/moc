@@ -2,6 +2,7 @@ import express from 'express'
 import cors from 'cors'
 import { fileURLToPath } from 'url'
 import path from 'path'
+import fs from 'fs'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -213,11 +214,21 @@ app.post('/api/sms', async (req, res) => {
 // ---------------------------------------------------------------------------
 if (process.env.NODE_ENV === 'production') {
   const frontendDist = process.env.FRONTEND_DIST ?? path.join(__dirname, '../../medical-note-tool/dist')
+  const frontendIndexFile = path.join(frontendDist, 'index.html')
+  let frontendIndexHtml: string
+  try {
+    frontendIndexHtml = fs.readFileSync(frontendIndexFile, 'utf8')
+  } catch (error) {
+    throw new Error(
+      `Unable to read frontend index file at ${frontendIndexFile}. Build the frontend first or set FRONTEND_DIST to the correct directory.`,
+      { cause: error },
+    )
+  }
   app.use(express.static(frontendDist))
   // SPA fallback: serve index.html for any non-API route so client-side
   // routing works correctly.
   app.get('*', (_req, res) => {
-    res.sendFile(path.join(frontendDist, 'index.html'))
+    res.type('html').send(frontendIndexHtml)
   })
 }
 
