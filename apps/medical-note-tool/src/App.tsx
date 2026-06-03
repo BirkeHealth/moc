@@ -106,6 +106,17 @@ const NOTE_TYPE_OPTIONS = [
 const STATUSES: SmsStatus[] = ['Consultation Required', 'Notified', '2nd Text Sent', 'Replied Yes', 'Replied 2nd Text', 'Completed Visit', 'Text failed']
 const PRIORITIES: SmsPriority[] = ['High', 'Medium', 'Low']
 
+type ContraKey = 'contraDiabetes' | 'contraPancreatitis' | 'contraGastroparesis' | 'contraSeizures' | 'contraGlaucoma' | 'contraMtc' | 'contraMen2'
+const CONTRAINDICATION_FIELDS: { key: ContraKey; label: string }[] = [
+  { key: 'contraDiabetes', label: 'Type 1 Diabetes' },
+  { key: 'contraPancreatitis', label: 'Pancreatitis' },
+  { key: 'contraGastroparesis', label: 'Gastroparesis' },
+  { key: 'contraSeizures', label: 'Seizures' },
+  { key: 'contraGlaucoma', label: 'Glaucoma' },
+  { key: 'contraMtc', label: 'Personal/Family Hx of MTC' },
+  { key: 'contraMen2', label: 'Personal/Family Hx of MEN2' },
+]
+
 const INITIAL_FORM: FormData = {
   noteType: '', patientName: '', dob: '', phone: '', gender: '',
   heightFt: '', heightIn: '', weight: '',
@@ -210,7 +221,7 @@ const buildGenericBody = (fd: FormData, noteType: string): string => {
     `History of Present Illness: ${hpi}`,
     ``,
     `Assessment/Plan:`,
-    `Patient evaluated via telehealth. Will manage ${noteType.toLowerCase()} as discussed with patient.`,
+    `Patient evaluated via telehealth. Will manage ${noteType} as discussed with patient.`,
   ].join('\n')
 }
 
@@ -497,7 +508,7 @@ function MedicalNoteTool({ onBackToTools, onAddSmsRow }: { onBackToTools: () => 
   const isWeightManagement = formData.noteType === 'Weight Management' || formData.noteType === 'Weight Management Follow Up'
   const autoBmi = calcBmi(formData.heightFt, formData.heightIn, formData.weight)
 
-  const updateBoolField = (key: 'contraDiabetes' | 'contraPancreatitis' | 'contraGastroparesis' | 'contraSeizures' | 'contraGlaucoma' | 'contraMtc' | 'contraMen2', value: boolean) => {
+  const updateBoolField = (key: ContraKey, value: boolean) => {
     setCopyFeedback('')
     setFormData((current) => ({ ...current, [key]: value }))
   }
@@ -567,15 +578,7 @@ function MedicalNoteTool({ onBackToTools, onAddSmsRow }: { onBackToTools: () => 
               <label className="grid gap-1 text-sm text-slate-700">Goal BMI<input type="number" min="0" step="0.1" className={fieldClassName} value={formData.goalBmi} onChange={(event) => updateField('goalBmi', event.target.value)} /></label>
               <fieldset className="grid gap-2 rounded-md border border-slate-200 p-3">
                 <legend className="px-1 text-xs font-medium text-slate-600">Contraindications — Patient Denies</legend>
-                {([
-                  ['contraDiabetes', 'Type 1 Diabetes'],
-                  ['contraPancreatitis', 'Pancreatitis'],
-                  ['contraGastroparesis', 'Gastroparesis'],
-                  ['contraSeizures', 'Seizures'],
-                  ['contraGlaucoma', 'Glaucoma'],
-                  ['contraMtc', 'Personal/Family Hx of MTC'],
-                  ['contraMen2', 'Personal/Family Hx of MEN2'],
-                ] as const).map(([key, label]) => (
+                {CONTRAINDICATION_FIELDS.map(({ key, label }) => (
                   <label key={key} className="inline-flex items-center gap-2 text-sm text-slate-700">
                     <input type="checkbox" checked={formData[key]} onChange={(e) => updateBoolField(key, e.target.checked)} />
                     {label}
