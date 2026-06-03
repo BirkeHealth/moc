@@ -285,6 +285,7 @@ const TEMPORARY_ACCESS_CODE = 'MOC0813'
 const API_URL_PREFIX: string = (import.meta.env.VITE_API_URL as string | undefined) ?? ''
 const SMS_API_URL = `${API_URL_PREFIX}/api/sms`
 const SMS_ROWS_API_URL = `${API_URL_PREFIX}/api/sms-rows`
+const SMS_CHECK_REPLIES_URL = `${API_URL_PREFIX}/api/sms-check-replies`
 const fieldClassName = 'w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm outline-none transition focus:border-sky-400 focus:ring-2 focus:ring-sky-100'
 const buttonPrimaryClassName = 'inline-flex items-center justify-center rounded-md border border-sky-700 bg-sky-700 px-3 py-2 text-sm font-medium text-white transition hover:bg-sky-800'
 const buttonSecondaryClassName = 'inline-flex items-center justify-center rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50'
@@ -674,6 +675,7 @@ function SmsTableTool({
   onDeleteRow,
   templates,
   rowsStatusMessage,
+  onReloadRows,
 }: {
   onBackToTools: () => void
   rows: SmsRow[]
@@ -682,12 +684,14 @@ function SmsTableTool({
   onDeleteRow: (id: number) => void
   templates: SmsTemplates
   rowsStatusMessage: string
+  onReloadRows: () => Promise<void>
 }) {
   const [search, setSearch] = useState('')
   const [filterStatus, setFilterStatus] = useState<SmsStatus | ''>('')
   const [filterPriority, setFilterPriority] = useState<SmsPriority | ''>('')
   const [smsFeedback, setSmsFeedback] = useState('')
   const [isSending, setIsSending] = useState(false)
+  const [isCheckingReplies, setIsCheckingReplies] = useState(false)
   const [selectedSendAction, setSelectedSendAction] = useState('')
   const nextIdRef = useRef(1)
 
@@ -839,6 +843,26 @@ function SmsTableTool({
       buildMessage: (row) => buildCompletedMessage(templates.completed, getFirstName(row.patient)),
     })
 
+  const checkReplies = async () => {
+    setIsCheckingReplies(true)
+    setSmsFeedback('')
+    try {
+      const response = await fetch(SMS_CHECK_REPLIES_URL, { method: 'POST' })
+      const data = (await response.json().catch(() => ({}))) as { ok?: boolean; updatedCount?: number; error?: string }
+      if (!response.ok || !data.ok) {
+        setSmsFeedback(data.error ?? 'Check replies failed. Please try again.')
+        return
+      }
+      await onReloadRows()
+      const count = data.updatedCount ?? 0
+      setSmsFeedback(count > 0 ? `Updated ${count} ${getEntryNoun(count)} to "Replied Yes".` : 'No new "yes" replies found.')
+    } catch {
+      setSmsFeedback('Unable to check replies. Check your connection and try again.')
+    } finally {
+      setIsCheckingReplies(false)
+    }
+  }
+
   return (
     <main className="min-h-screen w-full px-3 py-4 sm:px-4">
       <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
@@ -895,13 +919,21 @@ function SmsTableTool({
               }
             }}
             className={`${fieldClassName} w-full sm:w-[260px]`}
-            disabled={isSending}
+            disabled={isSending || isCheckingReplies}
           >
             <option value="">Send Action</option>
             <option value="consultation-required">Process Consultation Required</option>
             <option value="follow-up">2nd Text Follow-up</option>
             <option value="completed">Completed Text</option>
           </select>
+          <button
+            type="button"
+            className={buttonSecondaryClassName}
+            onClick={checkReplies}
+            disabled={isSending || isCheckingReplies}
+          >
+            {isCheckingReplies ? 'Checking…' : 'Check replies'}
+          </button>
         </div>
         {smsFeedback && <p className="mt-2 text-sm text-slate-600" role="status" aria-live="polite">{smsFeedback}</p>}
         {rowsStatusMessage && <p className="mt-2 text-sm text-slate-600" role="status" aria-live="polite">{rowsStatusMessage}</p>}
@@ -1000,6 +1032,19 @@ function App() {
     void loadRows()
     return () => controller.abort()
   }, [])
+
+  const reloadSmsRows = async () => {
+    try {
+      const response = await fetch(SMS_ROWS_API_URL)
+      if (!response.ok) throw new Error(`Failed to load rows (${response.status})`)
+      const data = (await response.json()) as { rows?: SmsRow[] }
+      setSmsRows(Array.isArray(data.rows) ? data.rows : [])
+      setRowsStatusMessage('')
+    } catch (error) {
+      console.error('Failed to reload SMS rows:', error)
+      setRowsStatusMessage('Unable to load saved SMS rows. Showing local state only.')
+    }
+  }
 
   const createSmsRow = (row: SmsRow) => {
     setSmsRows((current) => [...current, row])
@@ -1137,6 +1182,7 @@ function App() {
       onDeleteRow={deleteSmsRow}
       templates={smsTemplates}
       rowsStatusMessage={rowsStatusMessage}
+      onReloadRows={reloadSmsRows}
     />
   )
 }
