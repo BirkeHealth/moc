@@ -11,6 +11,7 @@ type SmsTemplates = {
 }
 
 type FormData = {
+  noteType: string
   patientName: string
   dob: string
   phone: string
@@ -61,11 +62,32 @@ const ACCOUNT_OPTIONS = ['DORAL ACUPUNCTURE', 'HELIMEDS', 'PEAKS CURATIVE', 'CLI
 const PRESCRIBER_OPTIONS = ['ALBERTO NUNEZ PINA', 'YADIRA JEAN-LOUIS', 'LUK JEAN-LOUIS', 'EMILIO LUIS GONZALEZ', 'CHARLES SAROSY', 'ELIAZER MORGAN']
 const MEDICATION_OPTIONS = ['OZEMPIC/WAGOVY', 'ZEPBOUND/MONJAURO']
 const NOTE_PRIORITY_OPTIONS = ['Normal', 'Rush']
+const NOTE_TYPE_OPTIONS = [
+  'Anti-Aging',
+  'Anti-Aging Follow Up',
+  'Acne',
+  'Erectile Dysfunction',
+  'Female Sexual Health',
+  'Hair',
+  'General',
+  'Other',
+  'Medical Protocols',
+  'NAD',
+  'Nasal Sprays',
+  'Pre-Workout Protocols',
+  'Routine Checkup',
+  'Sexual Health',
+  'Sermorelin Therapy',
+  'Sleep Aid',
+  'Test',
+  'Weight Management',
+  'Weight Management Follow Up',
+]
 const STATUSES: SmsStatus[] = ['Consultation Required', 'Notified', '2nd Text Sent', 'Replied Yes', 'Replied 2nd Text', 'Completed Visit', 'Text failed']
 const PRIORITIES: SmsPriority[] = ['High', 'Medium', 'Low']
 
 const INITIAL_FORM: FormData = {
-  patientName: '', dob: '', phone: '', gender: '', heightFt: '', heightIn: '', weight: '', bmi: '', allergies: '', pmh: '', psh: '', medications: '', hasWeightLossProgram: '', hasGlp1: '', lastDose: '', account: '', prescriber: '', prescribedMedication: '', priority: 'Normal',
+  noteType: '', patientName: '', dob: '', phone: '', gender: '', heightFt: '', heightIn: '', weight: '', bmi: '', allergies: '', pmh: '', psh: '', medications: '', hasWeightLossProgram: '', hasGlp1: '', lastDose: '', account: '', prescriber: '', prescribedMedication: '', priority: 'Normal',
 }
 
 const INITIAL_SMS_ROWS: SmsRow[] = []
@@ -378,6 +400,12 @@ function MedicalNoteTool({ onBackToTools, onAddSmsRow }: { onBackToTools: () => 
       <p className="mt-1 text-sm text-slate-600">All processing stays in your browser. No data is saved or transmitted.</p>
       <div className="mt-4 grid gap-4 xl:grid-cols-[minmax(340px,1fr)_minmax(380px,1fr)]">
         <form className="grid gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm" onSubmit={(event) => event.preventDefault()}>
+          <label className="grid gap-1 text-sm text-slate-700">Medical Note Type
+            <select className={fieldClassName} value={formData.noteType} onChange={(event) => updateField('noteType', event.target.value)}>
+              <option value="">Select a note type</option>
+              {NOTE_TYPE_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}
+            </select>
+          </label>
           <label className="grid gap-1 text-sm text-slate-700">Patient Name<input className={fieldClassName} value={formData.patientName} onChange={(event) => updateField('patientName', event.target.value)} /></label>
           <label className="grid gap-1 text-sm text-slate-700">Date of Birth<input type="date" className={fieldClassName} value={formData.dob} onChange={(event) => updateField('dob', event.target.value)} /></label>
           <label className="grid gap-1 text-sm text-slate-700">Phone Number<input className={fieldClassName} value={formData.phone} onChange={(event) => updateField('phone', event.target.value)} /></label>
