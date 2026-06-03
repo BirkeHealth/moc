@@ -23,10 +23,6 @@ type FormData = {
   pmh: string
   psh: string
   medications: string
-  // Additional vitals
-  hr: string
-  bp: string
-  spo2: string
   // Follow-up & provider
   followUpInterval: string
   providerName: string
@@ -121,7 +117,6 @@ const INITIAL_FORM: FormData = {
   noteType: '', patientName: '', dob: '', phone: '', gender: '',
   heightFt: '', heightIn: '', weight: '',
   allergies: '', pmh: '', psh: '', medications: '',
-  hr: '', bp: '', spo2: '',
   followUpInterval: '', providerName: '',
   additionalNotes: '',
   hasWeightLossProgram: '', hasGlp1: '', lastDose: '',
@@ -241,7 +236,6 @@ const generateNote = (fd: FormData): string => {
   const vitals = [
     `Vitals:`,
     `Height: ${heightIn} in | Weight: ${v(fd.weight)} lbs | BMI: ${bmi}`,
-    `HR: ${v(fd.hr)} | BP: ${v(fd.bp)} | SpO2: ${v(fd.spo2)}`,
   ].join('\n')
 
   const isWeightManagement = noteType === 'Weight Management' || noteType === 'Weight Management Follow Up'
@@ -548,11 +542,6 @@ function MedicalNoteTool({ onBackToTools, onAddSmsRow }: { onBackToTools: () => 
           <label className="grid gap-1 text-sm text-slate-700">Past Surgical History (PSH)<textarea className={fieldClassName} value={formData.psh} onChange={(event) => updateField('psh', event.target.value)} /></label>
           <label className="grid gap-1 text-sm text-slate-700">Allergies<textarea className={fieldClassName} value={formData.allergies} onChange={(event) => updateField('allergies', event.target.value)} /></label>
           <label className="grid gap-1 text-sm text-slate-700">Current Medications<textarea className={fieldClassName} value={formData.medications} onChange={(event) => updateField('medications', event.target.value)} /></label>
-          <div className="grid gap-3 sm:grid-cols-3">
-            <label className="grid gap-1 text-sm text-slate-700">HR<input className={fieldClassName} value={formData.hr} onChange={(event) => updateField('hr', event.target.value)} /></label>
-            <label className="grid gap-1 text-sm text-slate-700">BP<input className={fieldClassName} value={formData.bp} onChange={(event) => updateField('bp', event.target.value)} /></label>
-            <label className="grid gap-1 text-sm text-slate-700">SpO2<input className={fieldClassName} value={formData.spo2} onChange={(event) => updateField('spo2', event.target.value)} /></label>
-          </div>
 
           {isWeightManagement && (
             <fieldset className="grid gap-3 rounded-md border border-slate-200 p-3">
