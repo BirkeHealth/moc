@@ -31,8 +31,10 @@ if (process.env.NODE_ENV === 'production' && !DATABASE_URL) {
   throw new Error('DATABASE_URL is required in production.')
 }
 
-const RINGCENTRAL_TOKEN_URL = 'https://platform.ringcentral.com/restapi/oauth/token'
-const RINGCENTRAL_SMS_URL = 'https://platform.ringcentral.com/restapi/v1.0/account/~/extension/~/sms'
+const RINGCENTRAL_BASE_URL = 'https://platform.ringcentral.com'
+const RINGCENTRAL_TOKEN_URL = `${RINGCENTRAL_BASE_URL}/restapi/oauth/token`
+const RINGCENTRAL_SMS_URL = `${RINGCENTRAL_BASE_URL}/restapi/v1.0/account/~/extension/~/sms`
+const RINGCENTRAL_MESSAGE_STORE_URL = `${RINGCENTRAL_BASE_URL}/restapi/v1.0/account/~/extension/~/message-store`
 
 // ---------------------------------------------------------------------------
 // Access-token cache — avoids re-exchanging the JWT on every request.
@@ -115,6 +117,17 @@ const parseSmsRowUpdate = (body: unknown): Omit<SmsRow, 'id'> | null => {
     priority: record.priority,
     phone: record.phone,
   }
+}
+
+// Normalize a phone number string to E.164 format (+1XXXXXXXXXX for US numbers).
+// Returns an empty string if the number cannot be normalized.
+const normalizePhoneNumber = (raw: string): string => {
+  if (!raw.trim()) return ''
+  const normalized = raw.trim().replace(/[^\d+]/g, '')
+  if (/^\+1\d{10}$/.test(normalized)) return normalized
+  if (/^1\d{10}$/.test(normalized)) return `+${normalized}`
+  if (/^\d{10}$/.test(normalized)) return `+1${normalized}`
+  return ''
 }
 
 const getDatabasePool = (res: express.Response): Pool | null => {
@@ -440,6 +453,112 @@ app.post('/api/sms', async (req, res) => {
     error: `RingCentral rejected the message (${smsResponse.status}${smsResponse.statusText ? ' ' + smsResponse.statusText : ''}).`,
     detail: errorBody,
   })
+})
+
+// ---------------------------------------------------------------------------
+// POST /api/sms-check-replies
+// Fetches inbound RingCentral SMS messages (with pagination), identifies phone
+// numbers whose message text contains the word "yes", then updates any SMS rows
+// currently in status "Notified" whose normalized phone number matches to
+// status "Replied Yes".
+// ---------------------------------------------------------------------------
+app.post('/api/sms-check-replies', smsRowsRateLimit, async (_req, res) => {
+  let accessToken: string
+  try {
+    accessToken = await getAccessToken()
+  } catch (err) {
+    console.error('Failed to obtain RingCentral access token:', err)
+    res.status(500).json({ ok: false, error: 'Unable to authenticate with RingCentral. Check server configuration.' })
+    return
+  }
+
+  // Fetch a single page, retrying once on 401 with a fresh token.
+  const fetchPage = async (url: string): Promise<Response> => {
+    let response = await fetch(url, { headers: { Authorization: 'Bearer ' + accessToken } })
+    if (response.status === 401) {
+      tokenCache = null
+      try {
+        accessToken = await fetchAccessToken()
+      } catch {
+        // Return the original 401 response if re-auth fails
+        return response
+      }
+      response = await fetch(url, { headers: { Authorization: 'Bearer ' + accessToken } })
+    }
+    return response
+  }
+
+  // Paginate through all inbound SMS messages
+  type RcMessage = { from?: { phoneNumber?: string }; subject?: string; text?: string }
+  const allMessages: RcMessage[] = []
+  let pageUrl: string | null = `${RINGCENTRAL_MESSAGE_STORE_URL}?type=SMS&direction=Inbound&perPage=100`
+
+  while (pageUrl) {
+    let response: Response
+    try {
+      response = await fetchPage(pageUrl)
+    } catch (err) {
+      console.error('Network error fetching RingCentral message-store:', err)
+      break
+    }
+
+    if (!response.ok) {
+      console.error(`RingCentral message-store error (${response.status})`)
+      break
+    }
+
+    const json = (await response.json()) as {
+      records?: RcMessage[]
+      navigation?: { nextPage?: { uri?: string } }
+    }
+
+    allMessages.push(...(json.records ?? []))
+    pageUrl = json.navigation?.nextPage?.uri ? RINGCENTRAL_BASE_URL + json.navigation.nextPage.uri : null
+  }
+
+  // Build a set of normalized phone numbers that replied "yes"
+  const yesNumbers = new Set<string>()
+  for (const msg of allMessages) {
+    const from = normalizePhoneNumber(msg.from?.phoneNumber ?? '')
+    if (!from) continue
+    const text = ((msg.subject ?? '') + ' ' + (msg.text ?? '')).toLowerCase()
+    if (/\byes\b/.test(text)) yesNumbers.add(from)
+  }
+
+  if (yesNumbers.size === 0) {
+    res.json({ ok: true, updatedCount: 0 })
+    return
+  }
+
+  const pool = getDatabasePool(res)
+  if (!pool) return
+
+  try {
+    // Find "Notified" rows whose normalized phone number appears in the yes-set
+    const notifiedResult = await pool.query<{ id: string; phone: string }>(
+      `SELECT id, phone FROM sms_rows WHERE status = 'Notified'`,
+    )
+
+    const idsToUpdate: number[] = []
+    for (const row of notifiedResult.rows) {
+      const phone = normalizePhoneNumber(row.phone)
+      if (phone && yesNumbers.has(phone)) {
+        idsToUpdate.push(Number(row.id))
+      }
+    }
+
+    if (idsToUpdate.length > 0) {
+      await pool.query(
+        `UPDATE sms_rows SET status = 'Replied Yes', updated_at = NOW() WHERE id = ANY($1)`,
+        [idsToUpdate],
+      )
+    }
+
+    res.json({ ok: true, updatedCount: idsToUpdate.length })
+  } catch (error) {
+    console.error('Failed to update SMS rows during check-replies:', error)
+    res.status(500).json({ ok: false, error: 'Failed to update SMS rows.' })
+  }
 })
 
 // ---------------------------------------------------------------------------
