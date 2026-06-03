@@ -836,10 +836,10 @@ function SmsTableTool({
 
   const sendCompletedTexts = async () =>
     processSmsRows({
-      eligibleStatus: 'Completed Visit',
+      eligibleStatus: '2nd Text Sent',
       sentStatus: 'Completed Visit',
       actionLabel: 'completed-visit',
-      emptyMessage: 'No completed-visit entries were found to process.',
+      emptyMessage: 'No 2nd-text-sent entries were found to process.',
       buildMessage: (row) => buildCompletedMessage(templates.completed, getFirstName(row.patient)),
     })
 
