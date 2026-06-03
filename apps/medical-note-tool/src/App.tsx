@@ -296,10 +296,6 @@ const getFirstName = (name: string) => {
   const [firstName] = name.trim().split(/\s+/)
   return firstName || 'there'
 }
-const formatAccountCode = (value: string) => {
-  const digits = value.replace(/\D/g, '').slice(0, 4)
-  return digits ? `ACC-${digits}` : ''
-}
 const mapNotePriorityToSmsPriority = (value: string): SmsPriority => (value === 'Rush' ? 'High' : 'Medium')
 const normalizePhoneNumber = (raw: string) => {
   if (!raw.trim()) return ''
@@ -495,7 +491,7 @@ function MedicalNoteTool({ onBackToTools, onAddSmsRow }: { onBackToTools: () => 
   const handleSmsAndCopy = async () => {
     try {
       await navigator.clipboard.writeText(noteText)
-      onAddSmsRow({ id: Date.now(), date: formatToday(), patient: formData.patientName, account: formatAccountCode(formData.account), prescriber: formData.prescriber || '', status: 'Consultation Required', priority: mapNotePriorityToSmsPriority(formData.priority), phone: formData.phone })
+      onAddSmsRow({ id: Date.now(), date: formatToday(), patient: formData.patientName, account: formData.account, prescriber: formData.prescriber || '', status: 'Consultation Required', priority: mapNotePriorityToSmsPriority(formData.priority), phone: formData.phone })
       setCopyFeedback('Note copied and added to SMS table.')
     } catch {
       setCopyFeedback('Unable to copy note. Please copy manually from the preview.')
@@ -967,7 +963,7 @@ function SmsTableTool({
                   <tr key={row.id}>
                     <td className="px-2 py-2 align-top"><input type="date" value={row.date} onChange={(event) => updateRow(row.id, 'date', event.target.value)} className="w-full min-w-0 rounded-md border border-slate-200 px-2 py-1.5 text-[11px]" /></td>
                     <td className="px-2 py-2 align-top"><input type="text" value={row.patient} placeholder="Patient name" onChange={(event) => updateRow(row.id, 'patient', event.target.value)} className="w-full min-w-0 rounded-md border border-slate-200 px-2 py-1.5 text-[11px]" /></td>
-                    <td className="px-2 py-2 align-top"><input type="text" value={row.account} placeholder="ACC-####" onChange={(event) => updateRow(row.id, 'account', event.target.value)} className="w-full min-w-0 rounded-md border border-slate-200 px-2 py-1.5 text-[11px]" /></td>
+                    <td className="px-2 py-2 align-top"><input type="text" value={row.account} placeholder="Client account" onChange={(event) => updateRow(row.id, 'account', event.target.value)} className="w-full min-w-0 rounded-md border border-slate-200 px-2 py-1.5 text-[11px]" /></td>
                     <td className="px-2 py-2 align-top"><input type="text" value={row.prescriber} placeholder="Dr. Name" onChange={(event) => updateRow(row.id, 'prescriber', event.target.value)} className="w-full min-w-0 rounded-md border border-slate-200 px-2 py-1.5 text-[11px]" /></td>
                     <td className="px-2 py-2 align-top">
                       <select value={row.status} onChange={(event) => updateRow(row.id, 'status', event.target.value as SmsStatus)} className={`w-full min-w-[180px] rounded-md border px-2 py-1.5 text-[11px] font-medium ${STATUS_STYLES[row.status]}`}>
