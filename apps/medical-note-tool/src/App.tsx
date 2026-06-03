@@ -472,6 +472,8 @@ function SmsTemplatesTool({ onBackToTools, templates, setTemplates }: { onBackTo
 function MedicalNoteTool({ onBackToTools, onAddSmsRow }: { onBackToTools: () => void; onAddSmsRow: (row: SmsRow) => void }) {
   const [formData, setFormData] = useState<FormData>(INITIAL_FORM)
   const [copyFeedback, setCopyFeedback] = useState('')
+  const [accountOptions, setAccountOptions] = useState<string[]>(() => ACCOUNT_OPTIONS)
+  const [newAccountOption, setNewAccountOption] = useState('')
 
   const noteText = useMemo(() => generateNote(formData), [formData])
 
@@ -505,6 +507,32 @@ function MedicalNoteTool({ onBackToTools, onAddSmsRow }: { onBackToTools: () => 
   const updateBoolField = (key: ContraKey, value: boolean) => {
     setCopyFeedback('')
     setFormData((current) => ({ ...current, [key]: value }))
+  }
+
+  const addAccountOption = () => {
+    const nextOption = newAccountOption.trim()
+    if (!nextOption) return
+    const existingOption = accountOptions.find((option) => option.toLowerCase() === nextOption.toLowerCase())
+    if (existingOption) {
+      setNewAccountOption('')
+      setCopyFeedback('Account / Client already exists and has been selected.')
+      setFormData((current) => ({ ...current, account: existingOption }))
+      return
+    }
+    setCopyFeedback('')
+    setAccountOptions((current) => [...current, nextOption])
+    setNewAccountOption('')
+    setFormData((current) => ({ ...current, account: nextOption }))
+  }
+
+  const removeAccountOption = (optionToRemove: string) => {
+    setCopyFeedback('')
+    setAccountOptions((current) => current.filter((option) => option !== optionToRemove))
+    setFormData((current) => (
+      current.account === optionToRemove
+        ? { ...current, account: '' }
+        : current
+    ))
   }
 
   return (
@@ -583,9 +611,35 @@ function MedicalNoteTool({ onBackToTools, onAddSmsRow }: { onBackToTools: () => 
           <label className="grid gap-1 text-sm text-slate-700">Account / Client
             <select className={fieldClassName} value={formData.account} onChange={(event) => updateField('account', event.target.value)}>
               <option value="">Select an account</option>
-              {ACCOUNT_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}
+              {accountOptions.map((option) => <option key={option} value={option}>{option}</option>)}
             </select>
           </label>
+          <div className="grid gap-2 rounded-md border border-slate-200 bg-slate-50 p-3">
+            <div className="flex flex-wrap gap-2">
+              <input
+                className={`${fieldClassName} flex-1`}
+                value={newAccountOption}
+                onChange={(event) => setNewAccountOption(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key !== 'Enter') return
+                  event.preventDefault()
+                  addAccountOption()
+                }}
+                placeholder="Add Account / Client option"
+              />
+              <button type="button" className={buttonSecondaryClassName} onClick={addAccountOption}>Add</button>
+            </div>
+            {accountOptions.length > 0 && (
+              <ul className="grid gap-1">
+                {accountOptions.map((option) => (
+                  <li key={option} className="flex items-center justify-between gap-2 rounded border border-slate-200 bg-white px-2 py-1 text-xs text-slate-700">
+                    <span>{option}</span>
+                    <button type="button" className="text-rose-600 transition hover:text-rose-700" aria-label={`Remove ${option}`} onClick={() => removeAccountOption(option)}>Remove</button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
           <label className="grid gap-1 text-sm text-slate-700">Prescriber
             <select className={fieldClassName} value={formData.prescriber} onChange={(event) => updateField('prescriber', event.target.value)}>
               <option value="">Select a prescriber</option>
