@@ -34,7 +34,10 @@ Set these in the Render dashboard under **Environment**:
 | `RINGCENTRAL_CLIENT_ID` | RingCentral app Client ID |
 | `RINGCENTRAL_CLIENT_SECRET` | RingCentral app Client Secret |
 | `RINGCENTRAL_FROM_NUMBER` | SMS sender number in E.164 format (e.g. `+13055550123`) |
+| `DATABASE_URL` | Postgres connection string (use the Render Postgres internal URL) |
 | `NODE_ENV` | Set to `production` (already set in `render.yaml`) |
+
+On startup, the API initializes the `sms_rows` table automatically (if it does not already exist).
 
 ### Local development
 
@@ -47,6 +50,8 @@ npm install
 npm run dev
 ```
 
+`DATABASE_URL` is optional in local development. If omitted, `/api/sms-rows` will return a configuration error until you provide a Postgres URL.
+
 Then start the frontend dev server (from `apps/medical-note-tool`):
 
 ```bash
@@ -57,4 +62,3 @@ npm run dev
 
 The Vite dev server proxies `/api` requests to `http://localhost:3001`
 automatically, so SMS sending works without any extra configuration.
-

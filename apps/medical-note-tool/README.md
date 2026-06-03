@@ -4,8 +4,8 @@ Static React app for generating medical note templates and sending SMS via a ser
 
 ## HIPAA / Data Handling
 
-- No database, analytics, or third-party trackers are used.
-- Patient data is only kept in browser memory while the page is open.
+- SMS table rows are persisted by the `medical-note-api` backend in Postgres via `DATABASE_URL`.
+- If the database is unreachable, the UI keeps temporary in-memory changes for the current session.
 - `Copy Note` copies to clipboard; `Reset Form` clears the in-memory form.
 - SMS is sent via the `medical-note-api` backend — no RingCentral credentials are stored in the browser or embedded in client-side code.
 

@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 
 type YesNo = '' | 'yes' | 'no'
@@ -68,11 +68,7 @@ const INITIAL_FORM: FormData = {
   patientName: '', dob: '', phone: '', gender: '', heightFt: '', heightIn: '', weight: '', bmi: '', allergies: '', pmh: '', psh: '', medications: '', hasWeightLossProgram: '', hasGlp1: '', lastDose: '', account: '', prescriber: '', prescribedMedication: '', priority: 'Normal',
 }
 
-const INITIAL_SMS_ROWS: SmsRow[] = [
-  { id: 1, date: '2026-05-28', patient: 'Maria Torres', account: 'ACC-1042', prescriber: 'Dr. Chen', status: 'Consultation Required', priority: 'High', phone: '(305) 555-0182' },
-  { id: 2, date: '2026-05-29', patient: 'James Holloway', account: 'ACC-0891', prescriber: 'Dr. Patel', status: 'Completed Visit', priority: 'Low', phone: '(786) 555-0341' },
-  { id: 3, date: '2026-05-30', patient: 'Sandra Kim', account: 'ACC-1107', prescriber: 'Dr. Reyes', status: 'Notified', priority: 'Medium', phone: '(954) 555-0029' },
-]
+const INITIAL_SMS_ROWS: SmsRow[] = []
 
 const MEDICAL_NOTE_TEMPLATE = `The patient {{PATIENT NAME}} is a {{AGE}} year old {{GENDER}} with a PMH of {{PMH}} seeking care for Weight Loss. Body Mass Index is {{BMI}}. Patient {{HAS_WEIGHT_LOSS_PROGRAM}} tried any weight loss programs. The patient {{HAS_GLP1}} tried any GLP1 medications in the past. The patient’s last dose of GLP1 medication or any weight loss related medication generic or non generic is {{LAST DOSE}}
 The patient is interested in GLP-1 RA medications. Denies personal history of type 1 diabetes, pancreatitis, gastroparesis, seizures or glaucoma. Denies personal or family history of Medullary Thyroid Cancer or Multiple Endocrine Neoplasia Type 2.
@@ -134,6 +130,7 @@ const TEMPORARY_ACCESS_CODE = 'MOC0813'
 // In development the Vite proxy rewrites /api to localhost:3001 automatically.
 const API_URL_PREFIX: string = (import.meta.env.VITE_API_URL as string | undefined) ?? ''
 const SMS_API_URL = `${API_URL_PREFIX}/api/sms`
+const SMS_ROWS_API_URL = `${API_URL_PREFIX}/api/sms-rows`
 const fieldClassName = 'w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm outline-none transition focus:border-sky-400 focus:ring-2 focus:ring-sky-100'
 const buttonPrimaryClassName = 'inline-flex items-center justify-center rounded-md border border-sky-700 bg-sky-700 px-3 py-2 text-sm font-medium text-white transition hover:bg-sky-800'
 const buttonSecondaryClassName = 'inline-flex items-center justify-center rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50'
@@ -448,14 +445,37 @@ function MedicalNoteTool({ onBackToTools, onAddSmsRow }: { onBackToTools: () => 
   )
 }
 
-function SmsTableTool({ onBackToTools, rows, setRows, templates }: { onBackToTools: () => void; rows: SmsRow[]; setRows: React.Dispatch<React.SetStateAction<SmsRow[]>>; templates: SmsTemplates }) {
+function SmsTableTool({
+  onBackToTools,
+  rows,
+  onCreateRow,
+  onUpdateRow,
+  onDeleteRow,
+  templates,
+  rowsStatusMessage,
+}: {
+  onBackToTools: () => void
+  rows: SmsRow[]
+  onCreateRow: (row: SmsRow) => void
+  onUpdateRow: (row: SmsRow) => void
+  onDeleteRow: (id: number) => void
+  templates: SmsTemplates
+  rowsStatusMessage: string
+}) {
   const [search, setSearch] = useState('')
   const [filterStatus, setFilterStatus] = useState<SmsStatus | ''>('')
   const [filterPriority, setFilterPriority] = useState<SmsPriority | ''>('')
   const [smsFeedback, setSmsFeedback] = useState('')
   const [isSending, setIsSending] = useState(false)
   const [selectedSendAction, setSelectedSendAction] = useState('')
-  const nextIdRef = useRef(Math.max(0, ...rows.map((row) => row.id)) + 1)
+  const nextIdRef = useRef(1)
+
+  useEffect(() => {
+    const maxId = Math.max(0, ...rows.map((row) => row.id))
+    if (nextIdRef.current <= maxId) {
+      nextIdRef.current = maxId + 1
+    }
+  }, [rows])
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase()
@@ -476,15 +496,17 @@ function SmsTableTool({ onBackToTools, rows, setRows, templates }: { onBackToToo
 
   const addRow = () => {
     const id = nextIdRef.current++
-    setRows((prev) => [...prev, { id, date: formatToday(), patient: '', account: '', prescriber: '', status: 'Consultation Required', priority: 'Medium', phone: '' }])
+    onCreateRow({ id, date: formatToday(), patient: '', account: '', prescriber: '', status: 'Consultation Required', priority: 'Medium', phone: '' })
   }
 
   const updateRow = <K extends keyof SmsRow>(id: number, field: K, value: SmsRow[K]) => {
-    setRows((prev) => prev.map((row) => (row.id === id ? { ...row, [field]: value } : row)))
+    const row = rows.find((entry) => entry.id === id)
+    if (!row) return
+    onUpdateRow({ ...row, [field]: value })
   }
 
   const deleteRow = (id: number) => {
-    setRows((prev) => prev.filter((row) => row.id !== id))
+    onDeleteRow(id)
   }
 
   const sendSms = async (to: string, text: string): Promise<SmsSendResult> => {
@@ -556,7 +578,11 @@ function SmsTableTool({ onBackToTools, rows, setRows, templates }: { onBackToToo
           failureDetails.push(`${getSmsRowLabel(row)}: ${result.error}`)
         }
       }
-      setRows((prev) => prev.map((row) => (updates.has(row.id) ? { ...row, status: updates.get(row.id)! } : row)))
+      rows.forEach((row) => {
+        const status = updates.get(row.id)
+        if (!status) return
+        onUpdateRow({ ...row, status })
+      })
       const processedCount = sentCount + failedCount
       const failureSummary = formatSmsFailureDetails(failureDetails)
       setSmsFeedback(`Processed ${processedCount} ${actionLabel} ${getEntryNoun(processedCount)} (sent: ${sentCount}, failed: ${failedCount}).${failureSummary ? ` ${failureSummary}` : ''}`)
@@ -657,6 +683,7 @@ function SmsTableTool({ onBackToTools, rows, setRows, templates }: { onBackToToo
           </select>
         </div>
         {smsFeedback && <p className="mt-2 text-sm text-slate-600" role="status" aria-live="polite">{smsFeedback}</p>}
+        {rowsStatusMessage && <p className="mt-2 text-sm text-slate-600" role="status" aria-live="polite">{rowsStatusMessage}</p>}
 
         <div className="mt-4 overflow-x-auto overflow-y-hidden rounded-lg border border-slate-200">
           <table className="w-full min-w-[900px] table-auto text-left text-xs text-slate-700">
@@ -732,6 +759,103 @@ function App() {
   const [selectedTool, setSelectedTool] = useState<ToolSelection>(null)
   const [smsRows, setSmsRows] = useState<SmsRow[]>(INITIAL_SMS_ROWS)
   const [smsTemplates, setSmsTemplates] = useState<SmsTemplates>(INITIAL_SMS_TEMPLATES)
+  const [rowsStatusMessage, setRowsStatusMessage] = useState('')
+
+  useEffect(() => {
+    const controller = new AbortController()
+    const loadRows = async () => {
+      try {
+        const response = await fetch(SMS_ROWS_API_URL, { signal: controller.signal })
+        if (!response.ok) throw new Error(`Failed to load rows (${response.status})`)
+        const data = (await response.json()) as { rows?: SmsRow[] }
+        setSmsRows(Array.isArray(data.rows) ? data.rows : [])
+        setRowsStatusMessage('')
+      } catch (error) {
+        if (controller.signal.aborted) return
+        console.error('Failed to load SMS rows:', error)
+        setRowsStatusMessage('Unable to load saved SMS rows. Showing local state only.')
+      }
+    }
+    void loadRows()
+    return () => controller.abort()
+  }, [])
+
+  const createSmsRow = (row: SmsRow) => {
+    setSmsRows((current) => [...current, row])
+    void (async () => {
+      try {
+        const response = await fetch(SMS_ROWS_API_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(row),
+        })
+        if (response.status === 409) {
+          setSmsRows((current) => {
+            let hasSeenRow = false
+            return current.filter((entry) => {
+              if (entry.id !== row.id) return true
+              if (hasSeenRow) return false
+              hasSeenRow = true
+              return true
+            })
+          })
+          setRowsStatusMessage('That row is already saved.')
+          return
+        }
+        if (!response.ok) throw new Error(`Failed to save row (${response.status})`)
+        setRowsStatusMessage('')
+      } catch (error) {
+        console.error(`Failed to create SMS row ${row.id}:`, error)
+        setRowsStatusMessage('Some SMS table changes could not be saved. Please retry.')
+      }
+    })()
+  }
+
+  const updateSmsRow = (row: SmsRow) => {
+    setSmsRows((current) => current.map((entry) => (entry.id === row.id ? row : entry)))
+    void (async () => {
+      try {
+        const response = await fetch(`${SMS_ROWS_API_URL}/${row.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            date: row.date,
+            patient: row.patient,
+            account: row.account,
+            prescriber: row.prescriber,
+            status: row.status,
+            priority: row.priority,
+            phone: row.phone,
+          }),
+        })
+        if (!response.ok) throw new Error(`Failed to update row (${response.status})`)
+        setRowsStatusMessage('')
+      } catch (error) {
+        console.error(`Failed to update SMS row ${row.id}:`, error)
+        setRowsStatusMessage('Some SMS table changes could not be saved. Please retry.')
+      }
+    })()
+  }
+
+  const deleteSmsRow = (id: number) => {
+    setSmsRows((current) => current.filter((entry) => entry.id !== id))
+    void (async () => {
+      try {
+        const response = await fetch(`${SMS_ROWS_API_URL}/${id}`, {
+          method: 'DELETE',
+        })
+        if (response.status === 404) {
+          setRowsStatusMessage('That row was already removed from saved data.')
+          return
+        }
+        if (!response.ok) throw new Error(`Failed to delete row (${response.status})`)
+        setRowsStatusMessage('')
+      } catch (error) {
+        console.error(`Failed to delete SMS row ${id}:`, error)
+        setRowsStatusMessage('Some SMS table changes could not be saved. Please retry.')
+      }
+    })()
+  }
 
   const handleAccessSubmit = (event: FormEvent) => {
     event.preventDefault()
@@ -776,14 +900,24 @@ function App() {
   }
 
   if (selectedTool === 'medical-note') {
-    return <MedicalNoteTool onBackToTools={() => setSelectedTool(null)} onAddSmsRow={(row) => setSmsRows((current) => [...current, row])} />
+    return <MedicalNoteTool onBackToTools={() => setSelectedTool(null)} onAddSmsRow={createSmsRow} />
   }
 
   if (selectedTool === 'sms-templates') {
     return <SmsTemplatesTool onBackToTools={() => setSelectedTool(null)} templates={smsTemplates} setTemplates={setSmsTemplates} />
   }
 
-  return <SmsTableTool onBackToTools={() => setSelectedTool(null)} rows={smsRows} setRows={setSmsRows} templates={smsTemplates} />
+  return (
+    <SmsTableTool
+      onBackToTools={() => setSelectedTool(null)}
+      rows={smsRows}
+      onCreateRow={createSmsRow}
+      onUpdateRow={updateSmsRow}
+      onDeleteRow={deleteSmsRow}
+      templates={smsTemplates}
+      rowsStatusMessage={rowsStatusMessage}
+    />
+  )
 }
 
 export default App
