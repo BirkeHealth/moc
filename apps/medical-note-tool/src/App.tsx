@@ -75,6 +75,7 @@ type SmsSendResult =
   | { ok: false; error: string }
 
 const ACCOUNT_OPTIONS = ['DORAL ACUPUNCTURE', 'HELIMEDS', 'PEAKS CURATIVE', 'CLINIC SECRET', 'TRUE LIO', 'WHITECOAT MD']
+const ACCOUNT_OPTIONS_STORAGE_KEY = 'medical-note-account-options'
 const PRESCRIBER_OPTIONS = ['ALBERTO NUNEZ PINA', 'YADIRA JEAN-LOUIS', 'LUK JEAN-LOUIS', 'EMILIO LUIS GONZALEZ', 'CHARLES SAROSY', 'ELIAZER MORGAN']
 const MEDICATION_OPTIONS = ['OZEMPIC/WAGOVY', 'ZEPBOUND/MONJAURO']
 const NOTE_PRIORITY_OPTIONS = ['Normal', 'Rush']
@@ -275,6 +276,23 @@ const PRIORITY_STYLES: Record<SmsPriority, string> = {
   Low: 'border-emerald-200 bg-emerald-50 text-emerald-700',
 }
 
+const getInitialAccountOptions = (): string[] => {
+  if (typeof window === 'undefined') return ACCOUNT_OPTIONS
+  try {
+    const raw = window.localStorage.getItem(ACCOUNT_OPTIONS_STORAGE_KEY)
+    if (!raw) return ACCOUNT_OPTIONS
+    const parsed = JSON.parse(raw)
+    if (!Array.isArray(parsed)) return ACCOUNT_OPTIONS
+    const options = parsed
+      .filter((value): value is string => typeof value === 'string')
+      .map((value) => value.trim())
+      .filter((value) => value.length > 0)
+    return options.length ? Array.from(new Set(options)) : ACCOUNT_OPTIONS
+  } catch {
+    return ACCOUNT_OPTIONS
+  }
+}
+
 const MISSING_VALUE = '—'
 const TEMPORARY_ACCESS_CODE = 'MOC0813'
 // SMS requests are forwarded to the server-side API which handles
@@ -472,8 +490,15 @@ function SmsTemplatesTool({ onBackToTools, templates, setTemplates }: { onBackTo
 function MedicalNoteTool({ onBackToTools, onAddSmsRow }: { onBackToTools: () => void; onAddSmsRow: (row: SmsRow) => void }) {
   const [formData, setFormData] = useState<FormData>(INITIAL_FORM)
   const [copyFeedback, setCopyFeedback] = useState('')
+  const [accountOptions, setAccountOptions] = useState<string[]>(() => getInitialAccountOptions())
+  const [newAccountOption, setNewAccountOption] = useState('')
 
   const noteText = useMemo(() => generateNote(formData), [formData])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    window.localStorage.setItem(ACCOUNT_OPTIONS_STORAGE_KEY, JSON.stringify(accountOptions))
+  }, [accountOptions])
 
   const updateField = (key: keyof FormData, value: string) => {
     setCopyFeedback('')
@@ -505,6 +530,31 @@ function MedicalNoteTool({ onBackToTools, onAddSmsRow }: { onBackToTools: () => 
   const updateBoolField = (key: ContraKey, value: boolean) => {
     setCopyFeedback('')
     setFormData((current) => ({ ...current, [key]: value }))
+  }
+
+  const addAccountOption = () => {
+    const nextOption = newAccountOption.trim()
+    if (!nextOption) return
+    const alreadyExists = accountOptions.find((option) => option.toLowerCase() === nextOption.toLowerCase())
+    if (alreadyExists) {
+      setNewAccountOption('')
+      updateField('account', alreadyExists)
+      return
+    }
+    setCopyFeedback('')
+    setAccountOptions((current) => [...current, nextOption])
+    setNewAccountOption('')
+    setFormData((current) => ({ ...current, account: nextOption }))
+  }
+
+  const removeAccountOption = (optionToRemove: string) => {
+    setCopyFeedback('')
+    setAccountOptions((current) => current.filter((option) => option !== optionToRemove))
+    setFormData((current) => (
+      current.account === optionToRemove
+        ? { ...current, account: '' }
+        : current
+    ))
   }
 
   return (
@@ -583,9 +633,30 @@ function MedicalNoteTool({ onBackToTools, onAddSmsRow }: { onBackToTools: () => 
           <label className="grid gap-1 text-sm text-slate-700">Account / Client
             <select className={fieldClassName} value={formData.account} onChange={(event) => updateField('account', event.target.value)}>
               <option value="">Select an account</option>
-              {ACCOUNT_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}
+              {accountOptions.map((option) => <option key={option} value={option}>{option}</option>)}
             </select>
           </label>
+          <div className="grid gap-2 rounded-md border border-slate-200 bg-slate-50 p-3">
+            <div className="flex flex-wrap gap-2">
+              <input
+                className={`${fieldClassName} flex-1`}
+                value={newAccountOption}
+                onChange={(event) => setNewAccountOption(event.target.value)}
+                placeholder="Add Account / Client option"
+              />
+              <button type="button" className={buttonSecondaryClassName} onClick={addAccountOption}>Add</button>
+            </div>
+            {accountOptions.length > 0 && (
+              <ul className="grid gap-1">
+                {accountOptions.map((option) => (
+                  <li key={option} className="flex items-center justify-between gap-2 rounded border border-slate-200 bg-white px-2 py-1 text-xs text-slate-700">
+                    <span>{option}</span>
+                    <button type="button" className="text-rose-600 transition hover:text-rose-700" onClick={() => removeAccountOption(option)}>Remove</button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
           <label className="grid gap-1 text-sm text-slate-700">Prescriber
             <select className={fieldClassName} value={formData.prescriber} onChange={(event) => updateField('prescriber', event.target.value)}>
               <option value="">Select a prescriber</option>
