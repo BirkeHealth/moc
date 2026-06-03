@@ -19,17 +19,37 @@ type FormData = {
   heightFt: string
   heightIn: string
   weight: string
-  bmi: string
   allergies: string
   pmh: string
   psh: string
   medications: string
+  // Additional vitals
+  hr: string
+  bp: string
+  spo2: string
+  // Follow-up & provider
+  followUpInterval: string
+  providerName: string
+  // Free-text additional notes
+  additionalNotes: string
+  // Weight Management specific
   hasWeightLossProgram: YesNo
   hasGlp1: YesNo
   lastDose: string
+  prescribedMedication: string
+  brandName: string
+  goalBmi: string
+  // Contraindications (patient denies)
+  contraDiabetes: boolean
+  contraPancreatitis: boolean
+  contraGastroparesis: boolean
+  contraSeizures: boolean
+  contraGlaucoma: boolean
+  contraMtc: boolean
+  contraMen2: boolean
+  // SMS / admin
   account: string
   prescriber: string
-  prescribedMedication: string
   priority: string
 }
 
@@ -86,46 +106,164 @@ const NOTE_TYPE_OPTIONS = [
 const STATUSES: SmsStatus[] = ['Consultation Required', 'Notified', '2nd Text Sent', 'Replied Yes', 'Replied 2nd Text', 'Completed Visit', 'Text failed']
 const PRIORITIES: SmsPriority[] = ['High', 'Medium', 'Low']
 
+type ContraKey = 'contraDiabetes' | 'contraPancreatitis' | 'contraGastroparesis' | 'contraSeizures' | 'contraGlaucoma' | 'contraMtc' | 'contraMen2'
+const CONTRAINDICATION_FIELDS: { key: ContraKey; label: string }[] = [
+  { key: 'contraDiabetes', label: 'Type 1 Diabetes' },
+  { key: 'contraPancreatitis', label: 'Pancreatitis' },
+  { key: 'contraGastroparesis', label: 'Gastroparesis' },
+  { key: 'contraSeizures', label: 'Seizures' },
+  { key: 'contraGlaucoma', label: 'Glaucoma' },
+  { key: 'contraMtc', label: 'Personal/Family Hx of MTC' },
+  { key: 'contraMen2', label: 'Personal/Family Hx of MEN2' },
+]
+
 const INITIAL_FORM: FormData = {
-  noteType: '', patientName: '', dob: '', phone: '', gender: '', heightFt: '', heightIn: '', weight: '', bmi: '', allergies: '', pmh: '', psh: '', medications: '', hasWeightLossProgram: '', hasGlp1: '', lastDose: '', account: '', prescriber: '', prescribedMedication: '', priority: 'Normal',
+  noteType: '', patientName: '', dob: '', phone: '', gender: '',
+  heightFt: '', heightIn: '', weight: '',
+  allergies: '', pmh: '', psh: '', medications: '',
+  hr: '', bp: '', spo2: '',
+  followUpInterval: '', providerName: '',
+  additionalNotes: '',
+  hasWeightLossProgram: '', hasGlp1: '', lastDose: '',
+  prescribedMedication: '', brandName: '', goalBmi: '',
+  contraDiabetes: false, contraPancreatitis: false, contraGastroparesis: false,
+  contraSeizures: false, contraGlaucoma: false, contraMtc: false, contraMen2: false,
+  account: '', prescriber: '', priority: 'Normal',
 }
 
 const INITIAL_SMS_ROWS: SmsRow[] = []
 
-const MEDICAL_NOTE_TEMPLATE = `The patient {{PATIENT NAME}} is a {{AGE}} year old {{GENDER}} with a PMH of {{PMH}} seeking care for Weight Loss. Body Mass Index is {{BMI}}. Patient {{HAS_WEIGHT_LOSS_PROGRAM}} tried any weight loss programs. The patient {{HAS_GLP1}} tried any GLP1 medications in the past. The patient’s last dose of GLP1 medication or any weight loss related medication generic or non generic is {{LAST DOSE}}
-The patient is interested in GLP-1 RA medications. Denies personal history of type 1 diabetes, pancreatitis, gastroparesis, seizures or glaucoma. Denies personal or family history of Medullary Thyroid Cancer or Multiple Endocrine Neoplasia Type 2.
+// ── Note generation ──────────────────────────────────────────────────────────
 
-Past medical history: {{PMH}}.
+const v = (val: string | undefined | null) => val?.trim() || MISSING_VALUE
 
-Past Surgical History: {{PSH}}
+const calcBmi = (heightFt: string, heightIn: string, weight: string): string => {
+  const totalInches = Number(heightFt || 0) * 12 + Number(heightIn || 0)
+  const weightLbs = Number(weight || 0)
+  if (!totalInches || !weightLbs) return MISSING_VALUE
+  return (weightLbs / (totalInches * totalInches) * 703).toFixed(1)
+}
 
-Allergies: {{Allergy}}
-
-Medications: {{MEDICATION}}
-
-Vitals:
-H: {{HEIGHT}} (in), W: {{WEIGHT}} (lbs), Body Mass Index: {{BMI}}
-
-Physical Exam: telehealth PE Asynchronous
+const PHYSICAL_EXAM_BLOCK = `Physical Exam: Telehealth PE — Asynchronous
 General: Well developed, well nourished.
 HEENT: Normocephalic, atraumatic, conjunctiva clear. No rhinorrhea. No obvious masses noted.
 Skin: No rashes noted.
-Other: The patient was examined via synchronous telemedicine, with its associated limitations.
+Other: The patient was examined via synchronous telemedicine, with its associated limitations.`
 
-Assessment: undefined - undefined
-Z71.3-Dietary Counseling and Surveillance
-Z72.4 -Inappropriate Diet and Eating Habits
+const buildMedHistorySection = (fd: FormData): string => [
+  `Past Medical History: ${v(fd.pmh)}`,
+  ``,
+  `Past Surgical History: ${v(fd.psh)}`,
+  ``,
+  `Allergies: ${v(fd.allergies)}`,
+  ``,
+  `Medications: ${v(fd.medications)}`,
+].join('\n')
 
-Plan:
-The patient is a candidate for GLP-1 RA medication. I'm writing a prescription for {{PATIENT NAME}}. We will initiate non-commercial dosing as it has been identified that the patient will see significant benefit from dosing that is not available under brand name {{ZEPBOUND/MONJAURO or OZEMPIC/WAGOVY}}.
+const buildFollowUpSection = (fd: FormData): string => {
+  const parts = [
+    `Follow-up: ${v(fd.followUpInterval)}`,
+    `Provider: ${v(fd.providerName)}`,
+  ]
+  if (fd.additionalNotes?.trim()) {
+    parts.push(``, `Additional Notes:`, fd.additionalNotes.trim())
+  }
+  return parts.join('\n')
+}
 
-Information on risks, benefits, and alternatives to treatment (including possible side effects such as nausea, vomiting, and abdominal pain, rarer side effects including pancreatitis, cholecystitis, kidney injury, hypoglycemia, and potential for malignancy) possibility of treatment failure, and expected duration of therapy which could last several months to several years.
+const buildWeightManagementBody = (fd: FormData): string => {
+  const bmi = calcBmi(fd.heightFt, fd.heightIn, fd.weight)
+  const hasTriedPrograms = fd.hasWeightLossProgram === 'yes' ? 'has' : fd.hasWeightLossProgram === 'no' ? 'has not' : MISSING_VALUE
+  const hasTriedGlp1 = fd.hasGlp1 === 'yes' ? 'has' : fd.hasGlp1 === 'no' ? 'has not' : MISSING_VALUE
 
-Will aim for no more than 1-2 lbs per week of weight loss and hope to achieve a goal BMI 22-24, will adjust dosing based on response and side effects.
+  const contraDenials: string[] = []
+  if (fd.contraDiabetes) contraDenials.push('type 1 diabetes')
+  if (fd.contraPancreatitis) contraDenials.push('pancreatitis')
+  if (fd.contraGastroparesis) contraDenials.push('gastroparesis')
+  if (fd.contraSeizures) contraDenials.push('seizures')
+  if (fd.contraGlaucoma) contraDenials.push('glaucoma')
+  if (fd.contraMtc) contraDenials.push('personal or family history of Medullary Thyroid Cancer')
+  if (fd.contraMen2) contraDenials.push('personal or family history of Multiple Endocrine Neoplasia Type 2')
+  const contraDenialText = contraDenials.length
+    ? `Denies ${contraDenials.join(', ')}.`
+    : `No contraindications documented.`
 
-Recommend drinking sufficient water and working on adhering to a balanced diet with appropriate portion control.
+  const brandDisplay = v(fd.brandName) !== MISSING_VALUE ? v(fd.brandName) : v(fd.prescribedMedication)
+  const goalBmiDisplay = v(fd.goalBmi) !== MISSING_VALUE ? v(fd.goalBmi) : bmi !== MISSING_VALUE ? '22–24' : MISSING_VALUE
 
-Will follow up with patient in 3-4 weeks to assess response and side effects.`
+  return [
+    `Patient ${hasTriedPrograms} tried any weight loss programs. The patient ${hasTriedGlp1} tried any GLP-1 medications in the past. The patient's last dose of GLP-1 medication or any weight loss related medication (generic or non-generic) is ${v(fd.lastDose)}.`,
+    ``,
+    `The patient is interested in GLP-1 RA medications. ${contraDenialText}`,
+    ``,
+    `Assessment:`,
+    `Z71.3 — Dietary Counseling and Surveillance`,
+    `Z72.4 — Inappropriate Diet and Eating Habits`,
+    ``,
+    `Plan:`,
+    `The patient is a candidate for GLP-1 RA medication. Prescribing for ${v(fd.patientName)}. We will initiate non-commercial dosing as it has been identified that the patient will see significant benefit from dosing that is not available under brand name ${brandDisplay}.`,
+    ``,
+    `Information on risks, benefits, and alternatives to treatment (including possible side effects such as nausea, vomiting, and abdominal pain, rarer side effects including pancreatitis, cholecystitis, kidney injury, hypoglycemia, and potential for malignancy), possibility of treatment failure, and expected duration of therapy (which could last several months to several years) has been discussed.`,
+    ``,
+    `Will aim for no more than 1–2 lbs per week of weight loss and hope to achieve a goal BMI of ${goalBmiDisplay}. Will adjust dosing based on response and side effects.`,
+    ``,
+    `Recommend drinking sufficient water and adhering to a balanced diet with appropriate portion control.`,
+  ].join('\n')
+}
+
+const buildGenericBody = (fd: FormData, noteType: string): string => {
+  const hpi = fd.additionalNotes?.trim()
+    ? fd.additionalNotes.trim()
+    : MISSING_VALUE
+  return [
+    `Chief Complaint: Patient presenting for ${noteType}.`,
+    ``,
+    `History of Present Illness: ${hpi}`,
+    ``,
+    `Assessment/Plan:`,
+    `Patient evaluated via telehealth. Will manage ${noteType} as discussed with patient.`,
+  ].join('\n')
+}
+
+const generateNote = (fd: FormData): string => {
+  const noteType = fd.noteType || 'General'
+  const today = formatToday()
+  const bmi = calcBmi(fd.heightFt, fd.heightIn, fd.weight)
+  const heightIn = getHeightInches(fd.heightFt, fd.heightIn)
+
+  const header = [
+    `Date of Service: ${today}`,
+    `Visit Type: ${noteType}`,
+    ``,
+    `The patient ${v(fd.patientName)} is a ${getAge(fd.dob)} year old ${v(fd.gender)} presenting for ${noteType}.`,
+  ].join('\n')
+
+  const vitals = [
+    `Vitals:`,
+    `Height: ${heightIn} in | Weight: ${v(fd.weight)} lbs | BMI: ${bmi}`,
+    `HR: ${v(fd.hr)} | BP: ${v(fd.bp)} | SpO2: ${v(fd.spo2)}`,
+  ].join('\n')
+
+  const isWeightManagement = noteType === 'Weight Management' || noteType === 'Weight Management Follow Up'
+  const visitBody = isWeightManagement
+    ? buildWeightManagementBody(fd)
+    : buildGenericBody(fd, noteType)
+
+  return [
+    header,
+    ``,
+    vitals,
+    ``,
+    visitBody,
+    ``,
+    buildMedHistorySection(fd),
+    ``,
+    PHYSICAL_EXAM_BLOCK,
+    ``,
+    buildFollowUpSection(fd),
+  ].join('\n')
+}
+
 
 const STATUS_STYLES: Record<SmsStatus, string> = {
   'Consultation Required': 'border-amber-200 bg-amber-50 text-amber-700',
@@ -270,12 +408,6 @@ const getHeightInches = (feet: string, inches: string): string => {
   return String(feetValue * 12 + inchesValue)
 }
 
-const getYesNoPhrase = (value: YesNo): string => {
-  if (value === 'yes') return 'has'
-  if (value === 'no') return 'has not'
-  return MISSING_VALUE
-}
-
 const fillTemplate = (template: string, values: Record<string, string>): string =>
   Object.entries(values).reduce((result, [key, value]) => result.replace(new RegExp(`\\{\\{${key}\\}\\}`, 'g'), value || MISSING_VALUE), template)
 
@@ -347,25 +479,7 @@ function MedicalNoteTool({ onBackToTools, onAddSmsRow }: { onBackToTools: () => 
   const [formData, setFormData] = useState<FormData>(INITIAL_FORM)
   const [copyFeedback, setCopyFeedback] = useState('')
 
-  const noteText = useMemo(() => {
-    const replacements: Record<string, string> = {
-      'PATIENT NAME': formData.patientName || MISSING_VALUE,
-      AGE: getAge(formData.dob),
-      GENDER: formData.gender || MISSING_VALUE,
-      PMH: formData.pmh || MISSING_VALUE,
-      BMI: formData.bmi || MISSING_VALUE,
-      HAS_WEIGHT_LOSS_PROGRAM: getYesNoPhrase(formData.hasWeightLossProgram),
-      HAS_GLP1: getYesNoPhrase(formData.hasGlp1),
-      'LAST DOSE': formData.lastDose || MISSING_VALUE,
-      PSH: formData.psh || MISSING_VALUE,
-      Allergy: formData.allergies || MISSING_VALUE,
-      MEDICATION: formData.medications || MISSING_VALUE,
-      HEIGHT: getHeightInches(formData.heightFt, formData.heightIn),
-      WEIGHT: formData.weight || MISSING_VALUE,
-      'ZEPBOUND/MONJAURO or OZEMPIC/WAGOVY': formData.prescribedMedication || MISSING_VALUE,
-    }
-    return fillTemplate(MEDICAL_NOTE_TEMPLATE, replacements)
-  }, [formData])
+  const noteText = useMemo(() => generateNote(formData), [formData])
 
   const updateField = (key: keyof FormData, value: string) => {
     setCopyFeedback('')
@@ -389,6 +503,14 @@ function MedicalNoteTool({ onBackToTools, onAddSmsRow }: { onBackToTools: () => 
     } catch {
       setCopyFeedback('Unable to copy note. Please copy manually from the preview.')
     }
+  }
+
+  const isWeightManagement = formData.noteType === 'Weight Management' || formData.noteType === 'Weight Management Follow Up'
+  const autoBmi = calcBmi(formData.heightFt, formData.heightIn, formData.weight)
+
+  const updateBoolField = (key: ContraKey, value: boolean) => {
+    setCopyFeedback('')
+    setFormData((current) => ({ ...current, [key]: value }))
   }
 
   return (
@@ -416,25 +538,59 @@ function MedicalNoteTool({ onBackToTools, onAddSmsRow }: { onBackToTools: () => 
           </fieldset>
           <div className="grid gap-3 sm:grid-cols-2">
             <label className="grid gap-1 text-sm text-slate-700">Height (ft)<input type="number" min="0" className={fieldClassName} value={formData.heightFt} onChange={(event) => updateField('heightFt', event.target.value)} /></label>
-            <label className="grid gap-1 text-sm text-slate-700">Height (in)<input type="number" min="0" className={fieldClassName} value={formData.heightIn} onChange={(event) => updateField('heightIn', event.target.value)} /></label>
+            <label className="grid gap-1 text-sm text-slate-700">Height (in)<input type="number" min="0" max="11" className={fieldClassName} value={formData.heightIn} onChange={(event) => updateField('heightIn', event.target.value)} /></label>
           </div>
           <label className="grid gap-1 text-sm text-slate-700">Weight (lbs)<input type="number" min="0" className={fieldClassName} value={formData.weight} onChange={(event) => updateField('weight', event.target.value)} /></label>
-          <label className="grid gap-1 text-sm text-slate-700">BMI<input className={fieldClassName} value={formData.bmi} onChange={(event) => updateField('bmi', event.target.value)} /></label>
-          <label className="grid gap-1 text-sm text-slate-700">Allergies<textarea className={fieldClassName} value={formData.allergies} onChange={(event) => updateField('allergies', event.target.value)} /></label>
+          <label className="grid gap-1 text-sm text-slate-700">BMI (auto-calculated)
+            <input className={`${fieldClassName} bg-slate-50 text-slate-500`} readOnly value={autoBmi === MISSING_VALUE ? '' : autoBmi} placeholder="Enter height and weight" />
+          </label>
           <label className="grid gap-1 text-sm text-slate-700">Past Medical History (PMH)<textarea className={fieldClassName} value={formData.pmh} onChange={(event) => updateField('pmh', event.target.value)} /></label>
           <label className="grid gap-1 text-sm text-slate-700">Past Surgical History (PSH)<textarea className={fieldClassName} value={formData.psh} onChange={(event) => updateField('psh', event.target.value)} /></label>
+          <label className="grid gap-1 text-sm text-slate-700">Allergies<textarea className={fieldClassName} value={formData.allergies} onChange={(event) => updateField('allergies', event.target.value)} /></label>
           <label className="grid gap-1 text-sm text-slate-700">Current Medications<textarea className={fieldClassName} value={formData.medications} onChange={(event) => updateField('medications', event.target.value)} /></label>
-          <fieldset className="grid gap-2 rounded-md border border-slate-200 p-3">
-            <legend className="px-1 text-xs font-medium text-slate-600">Previous Weight Loss Programs</legend>
-            <label className="inline-flex items-center gap-2 text-sm text-slate-700"><input type="radio" name="weight-loss" checked={formData.hasWeightLossProgram === 'yes'} onChange={() => updateField('hasWeightLossProgram', 'yes')} />Yes</label>
-            <label className="inline-flex items-center gap-2 text-sm text-slate-700"><input type="radio" name="weight-loss" checked={formData.hasWeightLossProgram === 'no'} onChange={() => updateField('hasWeightLossProgram', 'no')} />No</label>
-          </fieldset>
-          <fieldset className="grid gap-2 rounded-md border border-slate-200 p-3">
-            <legend className="px-1 text-xs font-medium text-slate-600">Previous GLP-1 Medication Use</legend>
-            <label className="inline-flex items-center gap-2 text-sm text-slate-700"><input type="radio" name="glp1" checked={formData.hasGlp1 === 'yes'} onChange={() => updateField('hasGlp1', 'yes')} />Yes</label>
-            <label className="inline-flex items-center gap-2 text-sm text-slate-700"><input type="radio" name="glp1" checked={formData.hasGlp1 === 'no'} onChange={() => updateField('hasGlp1', 'no')} />No</label>
-          </fieldset>
-          <label className="grid gap-1 text-sm text-slate-700">Last Dose of GLP-1 or Weight-Loss Medication<input className={fieldClassName} value={formData.lastDose} onChange={(event) => updateField('lastDose', event.target.value)} /></label>
+          <div className="grid gap-3 sm:grid-cols-3">
+            <label className="grid gap-1 text-sm text-slate-700">HR<input className={fieldClassName} value={formData.hr} onChange={(event) => updateField('hr', event.target.value)} /></label>
+            <label className="grid gap-1 text-sm text-slate-700">BP<input className={fieldClassName} value={formData.bp} onChange={(event) => updateField('bp', event.target.value)} /></label>
+            <label className="grid gap-1 text-sm text-slate-700">SpO2<input className={fieldClassName} value={formData.spo2} onChange={(event) => updateField('spo2', event.target.value)} /></label>
+          </div>
+
+          {isWeightManagement && (
+            <fieldset className="grid gap-3 rounded-md border border-slate-200 p-3">
+              <legend className="px-1 text-xs font-medium text-slate-600">Weight Management</legend>
+              <fieldset className="grid gap-2 rounded-md border border-slate-200 p-3">
+                <legend className="px-1 text-xs font-medium text-slate-600">Previous Weight Loss Programs</legend>
+                <label className="inline-flex items-center gap-2 text-sm text-slate-700"><input type="radio" name="weight-loss" checked={formData.hasWeightLossProgram === 'yes'} onChange={() => updateField('hasWeightLossProgram', 'yes')} />Yes</label>
+                <label className="inline-flex items-center gap-2 text-sm text-slate-700"><input type="radio" name="weight-loss" checked={formData.hasWeightLossProgram === 'no'} onChange={() => updateField('hasWeightLossProgram', 'no')} />No</label>
+              </fieldset>
+              <fieldset className="grid gap-2 rounded-md border border-slate-200 p-3">
+                <legend className="px-1 text-xs font-medium text-slate-600">Previous GLP-1 Medication Use</legend>
+                <label className="inline-flex items-center gap-2 text-sm text-slate-700"><input type="radio" name="glp1" checked={formData.hasGlp1 === 'yes'} onChange={() => updateField('hasGlp1', 'yes')} />Yes</label>
+                <label className="inline-flex items-center gap-2 text-sm text-slate-700"><input type="radio" name="glp1" checked={formData.hasGlp1 === 'no'} onChange={() => updateField('hasGlp1', 'no')} />No</label>
+              </fieldset>
+              <label className="grid gap-1 text-sm text-slate-700">Last Dose of GLP-1 or Weight-Loss Medication<input className={fieldClassName} value={formData.lastDose} onChange={(event) => updateField('lastDose', event.target.value)} /></label>
+              <label className="grid gap-1 text-sm text-slate-700">Medication Being Prescribed
+                <select className={fieldClassName} value={formData.prescribedMedication} onChange={(event) => updateField('prescribedMedication', event.target.value)}>
+                  <option value="">Select medication</option>
+                  {MEDICATION_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}
+                </select>
+              </label>
+              <label className="grid gap-1 text-sm text-slate-700">Brand Name<input className={fieldClassName} value={formData.brandName} onChange={(event) => updateField('brandName', event.target.value)} /></label>
+              <label className="grid gap-1 text-sm text-slate-700">Goal BMI<input type="number" min="0" step="0.1" className={fieldClassName} value={formData.goalBmi} onChange={(event) => updateField('goalBmi', event.target.value)} /></label>
+              <fieldset className="grid gap-2 rounded-md border border-slate-200 p-3">
+                <legend className="px-1 text-xs font-medium text-slate-600">Contraindications — Patient Denies</legend>
+                {CONTRAINDICATION_FIELDS.map(({ key, label }) => (
+                  <label key={key} className="inline-flex items-center gap-2 text-sm text-slate-700">
+                    <input type="checkbox" checked={formData[key]} onChange={(e) => updateBoolField(key, e.target.checked)} />
+                    {label}
+                  </label>
+                ))}
+              </fieldset>
+            </fieldset>
+          )}
+
+          <label className="grid gap-1 text-sm text-slate-700">Follow-up Interval<input className={fieldClassName} value={formData.followUpInterval} onChange={(event) => updateField('followUpInterval', event.target.value)} placeholder="e.g. 3–4 weeks" /></label>
+          <label className="grid gap-1 text-sm text-slate-700">Provider Name<input className={fieldClassName} value={formData.providerName} onChange={(event) => updateField('providerName', event.target.value)} /></label>
+          <label className="grid gap-1 text-sm text-slate-700">Additional Notes<textarea className={`${fieldClassName} min-h-[80px]`} value={formData.additionalNotes} onChange={(event) => updateField('additionalNotes', event.target.value)} /></label>
           <label className="grid gap-1 text-sm text-slate-700">Account / Client
             <select className={fieldClassName} value={formData.account} onChange={(event) => updateField('account', event.target.value)}>
               <option value="">Select an account</option>
@@ -445,12 +601,6 @@ function MedicalNoteTool({ onBackToTools, onAddSmsRow }: { onBackToTools: () => 
             <select className={fieldClassName} value={formData.prescriber} onChange={(event) => updateField('prescriber', event.target.value)}>
               <option value="">Select a prescriber</option>
               {PRESCRIBER_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}
-            </select>
-          </label>
-          <label className="grid gap-1 text-sm text-slate-700">Medication Being Prescribed
-            <select className={fieldClassName} value={formData.prescribedMedication} onChange={(event) => updateField('prescribedMedication', event.target.value)}>
-              <option value="">Select medication</option>
-              {MEDICATION_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}
             </select>
           </label>
           <label className="grid gap-1 text-sm text-slate-700">Priority
